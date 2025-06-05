@@ -26,7 +26,7 @@ if (API_KEY) {
 } else {
   // This warning will now also cover cases where process.env.API_KEY was inaccessible,
   // not just when it was explicitly undefined but accessible.
-  console.warn("Gemini API Key is not available. Gemini AI features will be unavailable. This could be due to process.env.API_KEY not being set or inaccessible in the current execution environment.");
+  console.warn(" API Key is not available. Gemini AI features will be unavailable. This could be due to process.env.API_KEY not being set or inaccessible in the current execution environment.");
 }
 
 export const isGeminiAvailable = (): boolean => !!ai;
@@ -57,9 +57,9 @@ export const getFinancialTip = async (balance: number, language: string = GEMINI
     if (error instanceof Error) {
         // Check if the error message already indicates an API key issue from the SDK itself
         if (error.message.toLowerCase().includes("api key")) {
-            throw new Error(`Gemini API error: ${error.message}`);
+            throw new Error(` API error: ${error.message}`);
         }
-        throw new Error(`Gemini API error during tip generation: ${error.message}`);
+        throw new Error(` API error during tip generation: ${error.message}`);
     }
     throw new Error("An unknown error occurred while fetching financial tip.");
   }
