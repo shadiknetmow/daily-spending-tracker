@@ -1,0 +1,115 @@
+
+import React, { useEffect, useState } from 'react';
+import { BN_UI_TEXT } from '../constants';
+
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full';
+}
+
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md' }) => {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        setIsVisible(true);
+      }, 10); 
+      
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+      // Adjust body padding to account for scrollbar width
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+      return () => {
+        clearTimeout(timer);
+        // Restore body scroll and padding when modal closes
+        document.body.style.overflow = 'auto';
+        document.body.style.paddingRight = '0';
+      };
+    } else {
+      setIsVisible(false);
+      // Ensure scroll is restored if closed by other means (e.g. parent unmount)
+      // setTimeout is used to allow modal close animation to finish before restoring scroll
+      setTimeout(() => {
+          if (!document.querySelector('.fixed.inset-0.bg-black.bg-opacity-70')) { // Check if any modal is still open
+             document.body.style.overflow = 'auto';
+             document.body.style.paddingRight = '0';
+          }
+      }, 300); // Match modal transition duration
+    }
+  }, [isOpen]);
+
+  if (!isOpen && !isVisible) return null; // Only render if open or visible (for closing animation)
+
+
+  const sizeClasses: Record<string, string> = {
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-xl',
+    '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
+    full: 'max-w-full h-full', 
+  };
+
+  return (
+    <div
+      className={`fixed inset-0 bg-black flex items-center justify-center p-4 z-[70] transition-opacity duration-300 ease-out ${isOpen && isVisible ? 'bg-opacity-70 opacity-100' : 'bg-opacity-0 opacity-0 pointer-events-none'}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      onClick={isOpen && isVisible ? onClose : undefined} 
+    >
+      <div
+        className={`
+          bg-white p-5 sm:p-6 rounded-xl shadow-2xl w-full ${sizeClasses[size]}
+          max-h-[90vh] flex flex-col
+          transform transition-all duration-300 ease-out
+          ${isOpen && isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
+        `}
+        onClick={(e) => e.stopPropagation()} 
+      >
+        <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200">
+          <h2 id="modal-title" className="text-xl sm:text-2xl font-semibold text-slate-800">
+            {title}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-700 transition-colors p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-teal-500"
+            aria-label={BN_UI_TEXT.CLOSE_BTN}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-grow custom-scrollbar-modal pr-1">
+          {children}
+        </div>
+      </div>
+      <style>{`
+        .custom-scrollbar-modal::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar-modal::-webkit-scrollbar-track {
+          background: #f8fafc; /* bg-slate-50 */
+          border-radius: 10px;
+        }
+        .custom-scrollbar-modal::-webkit-scrollbar-thumb {
+          background: #e2e8f0; /* slate-200 */
+          border-radius: 10px;
+        }
+        .custom-scrollbar-modal::-webkit-scrollbar-thumb:hover {
+          background: #cbd5e1; /* slate-300 */
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default Modal;
