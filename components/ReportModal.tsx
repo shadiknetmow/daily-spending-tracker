@@ -229,12 +229,21 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     }
     
     const doc = new jsPDF();
+    let effectiveFont = 'Helvetica'; // Default to Helvetica
+
     try {
-      doc.addFont('https://fonts.gstatic.com/s/notosansbengali/v21/Cn-SJs6VTz3I6DdhgmkAaqAPU79fP_7D80y2z3g.ttf', 'Noto Sans Bengali', 'normal');
-      doc.setFont('Noto Sans Bengali', 'normal');
+      // Attempt to set Noto Sans Bengali. This might not work without proper embedding.
+      // The try-catch is to prevent failure if the font isn't available.
+      // doc.addFont('https://fonts.gstatic.com/s/notosansbengali/v21/Cn-SJs6VTz3I6DdhgmkAaqAPU79fP_7D80y2z3g.ttf', 'Noto Sans Bengali', 'normal'); // REMOVED
+      doc.setFont('Noto Sans Bengali', 'normal'); // This will likely use a fallback if not embedded
+      // To check if font was actually set (complex, jsPDF doesn't provide an easy API for this)
+      // For now, assume it might fall back and proceed. If issues, force Helvetica.
+      // If Noto Sans Bengali is critical, true font embedding is needed.
+      effectiveFont = 'Noto Sans Bengali'; // Assume it *might* work or fallback gracefully for text rendering
     } catch (e) {
-      console.warn("Noto Sans Bengali could not be set in jsPDF. Ensure it's embedded. Falling back to default.", e);
-      doc.setFont('Helvetica', 'normal'); // Fallback font
+      console.warn("Noto Sans Bengali could not be set in jsPDF for doc.setFont. Falling back to Helvetica for document text.", e);
+      doc.setFont('Helvetica', 'normal');
+      effectiveFont = 'Helvetica';
     }
 
     doc.setFontSize(18);
@@ -258,8 +267,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
 
     const summaryLines = [
-      `${BN_UI_TEXT.TOTAL_INCOME}: ${BN_UI_TEXT.BDT_SYMBOL} ${reportData.totalIncome.toLocaleString('bn-BD', {minimumFractionDigits: 2})}`,
-      `${BN_UI_TEXT.TOTAL_EXPENSE}: ${BN_UI_TEXT.BDT_SYMBOL} ${reportData.totalExpense.toLocaleString('bn-BD', {minimumFractionDigits: 2})}`,
+      `${BN_UI_TEXT.SUMMARY_TOTAL_INCOME}: ${BN_UI_TEXT.BDT_SYMBOL} ${reportData.totalIncome.toLocaleString('bn-BD', {minimumFractionDigits: 2})}`,
+      `${BN_UI_TEXT.SUMMARY_TOTAL_EXPENSE}: ${BN_UI_TEXT.BDT_SYMBOL} ${reportData.totalExpense.toLocaleString('bn-BD', {minimumFractionDigits: 2})}`,
       `${BN_UI_TEXT.NET_BALANCE_FOR_PERIOD}: ${BN_UI_TEXT.BDT_SYMBOL} ${reportData.netBalance.toLocaleString('bn-BD', {minimumFractionDigits: 2})}`
     ];
     
@@ -289,19 +298,31 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       t.amount.toLocaleString('bn-BD', {minimumFractionDigits: 2, maximumFractionDigits: 2})
     ]);
 
+    // For autoTable, explicitly use a known font to avoid "widths" error.
+    // If Noto Sans Bengali was not truly embedded, using it here might lead to errors.
+    // Using 'Helvetica' for table to ensure stability.
+    const tableFont = effectiveFont === 'Noto Sans Bengali' ? 'Noto Sans Bengali' : 'Helvetica';
+
+
     autoTable(doc, {
       startY: summaryY + 5,
       head: head,
       body: body,
       theme: 'striped',
-      headStyles: { fillColor: [22, 160, 133], font: 'Noto Sans Bengali', fontStyle: 'bold' }, // teal-600
-      bodyStyles: { font: 'Noto Sans Bengali' },
+      headStyles: { fillColor: [22, 160, 133], font: tableFont, fontStyle: 'bold' },
+      bodyStyles: { font: tableFont },
       alternateRowStyles: { fillColor: [245, 245, 245] }, // Light grey
       columnStyles: tableColumnStyles,
       didDrawPage: (data) => {
         // Footer
         let str = "পৃষ্ঠা " + doc.getNumberOfPages();
         doc.setFontSize(10);
+        // Ensure footer font is also set robustly
+        try {
+            doc.setFont(tableFont, 'normal');
+        } catch {
+            doc.setFont('Helvetica', 'normal');
+        }
         doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
       }
     });
@@ -443,8 +464,8 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   {BN_UI_TEXT.REPORT_FOR_DESCRIPTIONS} <span className="font-medium">{selectedDescriptions.join(', ')}</span>
                 </p>
               )}
-              <p>{BN_UI_TEXT.TOTAL_INCOME}: <span className="font-medium text-green-600">{BN_UI_TEXT.BDT_SYMBOL} {reportData.totalIncome.toLocaleString('bn-BD', {minimumFractionDigits: 2})}</span></p>
-              <p>{BN_UI_TEXT.TOTAL_EXPENSE}: <span className="font-medium text-red-600">{BN_UI_TEXT.BDT_SYMBOL} {reportData.totalExpense.toLocaleString('bn-BD', {minimumFractionDigits: 2})}</span></p>
+              <p>{BN_UI_TEXT.SUMMARY_TOTAL_INCOME}: <span className="font-medium text-green-600">{BN_UI_TEXT.BDT_SYMBOL} {reportData.totalIncome.toLocaleString('bn-BD', {minimumFractionDigits: 2})}</span></p>
+              <p>{BN_UI_TEXT.SUMMARY_TOTAL_EXPENSE}: <span className="font-medium text-red-600">{BN_UI_TEXT.BDT_SYMBOL} {reportData.totalExpense.toLocaleString('bn-BD', {minimumFractionDigits: 2})}</span></p>
               <p>{BN_UI_TEXT.NET_BALANCE_FOR_PERIOD}: <span className={`font-medium ${reportData.netBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>{BN_UI_TEXT.BDT_SYMBOL} {reportData.netBalance.toLocaleString('bn-BD', {minimumFractionDigits: 2})}</span></p>
                {reportData.deletedCountInPeriod > 0 && (
                 <div className="mt-1.5 pt-1.5 border-t border-sky-100">

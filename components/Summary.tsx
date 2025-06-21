@@ -1,14 +1,13 @@
-
 import React from 'react';
-import { BN_UI_TEXT } from '../constants';
+import { BN_UI_TEXT } from '../constants'; // Updated path, points to constants.ts which imports from new i18n structure
 
 interface SummaryCardProps {
   title: string;
   amount: number;
   colorClass: string;
-  onClick?: () => void; // Make onClick optional
-  isClickable?: boolean; // To add specific styles for clickable cards
-  ariaLabelDetails?: string; // More specific aria label part
+  onClick?: () => void; 
+  isClickable?: boolean; 
+  ariaLabelDetails?: string; 
 }
 
 const SummaryCard: React.FC<SummaryCardProps> = ({ title, amount, colorClass, onClick, isClickable, ariaLabelDetails }) => (
@@ -34,7 +33,7 @@ interface SummaryProps {
   totalPayable: number;
   totalReceivable: number;
   onOpenReceivablePersonsModal: () => void;
-  onOpenPayablePersonsModal: () => void; // New prop
+  onOpenPayablePersonsModal: () => void; 
 }
 
 const Summary: React.FC<SummaryProps> = ({ 
@@ -44,16 +43,16 @@ const Summary: React.FC<SummaryProps> = ({
   totalPayable, 
   totalReceivable,
   onOpenReceivablePersonsModal,
-  onOpenPayablePersonsModal // Destructure new prop
+  onOpenPayablePersonsModal 
 }) => {
   return (
     <section aria-labelledby="summary-heading" className="my-8 p-4 md:p-6 bg-white rounded-xl shadow-lg">
       <h2 id="summary-heading" className="sr-only">Financial Summary</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        <SummaryCard title={BN_UI_TEXT.TOTAL_INCOME} amount={totalIncome} colorClass="bg-green-100 text-green-700" />
-        <SummaryCard title={BN_UI_TEXT.TOTAL_EXPENSE} amount={totalExpense} colorClass="bg-red-100 text-red-700" />
+        <SummaryCard title={BN_UI_TEXT.SUMMARY_TOTAL_INCOME} amount={totalIncome} colorClass="bg-green-100 text-green-700" />
+        <SummaryCard title={BN_UI_TEXT.SUMMARY_TOTAL_EXPENSE} amount={totalExpense} colorClass="bg-red-100 text-red-700" />
         <SummaryCard 
-          title={BN_UI_TEXT.CURRENT_BALANCE} 
+          title={BN_UI_TEXT.SUMMARY_CURRENT_BALANCE} 
           amount={balance} 
           colorClass={balance >= 0 ? "bg-sky-100 text-sky-700" : "bg-orange-100 text-orange-700"}
         />
@@ -61,16 +60,16 @@ const Summary: React.FC<SummaryProps> = ({
           title={BN_UI_TEXT.TOTAL_RECEIVABLE}
           amount={totalReceivable} 
           colorClass="bg-green-100 text-green-700"
-          onClick={onOpenReceivablePersonsModal} // Attach handler
-          isClickable={true} // Mark as clickable for styling and accessibility
+          onClick={onOpenReceivablePersonsModal} 
+          isClickable={true} 
           ariaLabelDetails={`মোট পাওনা ${totalReceivable.toLocaleString('bn-BD')} টাকা, বিস্তারিত দেখতে ক্লিক করুন`}
         />
         <SummaryCard 
           title={BN_UI_TEXT.TOTAL_PAYABLE}
           amount={totalPayable} 
           colorClass="bg-red-100 text-red-700"
-          onClick={onOpenPayablePersonsModal} // Attach handler for payable
-          isClickable={true} // Mark as clickable
+          onClick={onOpenPayablePersonsModal} 
+          isClickable={true} 
           ariaLabelDetails={`মোট দেনা ${totalPayable.toLocaleString('bn-BD')} টাকা, বিস্তারিত দেখতে ক্লিক করুন`}
         />
       </div>

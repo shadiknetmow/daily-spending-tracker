@@ -1,6 +1,6 @@
 
 import bcrypt from 'bcryptjs';
-import { User } from '../types';
+import { User, InvoicePaymentStatus, InvoicePaymentMethod } from '../types'; // Added InvoicePaymentMethod
 import { BN_UI_TEXT, APP_TITLE_FOR_EMAIL } from '../constants';
 import * as apiService from '../apiService';
 
@@ -22,12 +22,14 @@ export const signupUser = async (name: string, email: string, password: string):
       name,
       email: normalizedEmail,
       hashed_password: hashedPasswordValue,
+      enableSchemaCheckOnStartup: true, // Default for new users
+      enableDataFetchOnStartup: true,   // Default for new users
     };
 
     const response = await apiService.insertRecord('users', normalizedEmail, newUser);
 
     if (response.success) {
-      return { id: newUser.id, name: newUser.name, email: newUser.email };
+      return { id: newUser.id, name: newUser.name, email: newUser.email, enableSchemaCheckOnStartup: true, enableDataFetchOnStartup: true };
     } else {
       if (typeof response.error === 'string' &&
           (
@@ -240,17 +242,45 @@ export const changeUserPassword = async (userId: string, email: string, currentP
     }
 };
 
-export const updateUserProfile = async (userId: string, userEmail: string, updates: Partial<Pick<User, 'name' | 'mobileNumber' | 'facebookProfileUrl'>>): Promise<Partial<User>> => {
+export const updateUserProfile = async (userId: string, userEmail: string, updates: Partial<User>): Promise<Partial<User>> => {
   const fieldsToUpdate: Partial<User> = {};
+  
+  // Standard profile fields
   if (updates.name !== undefined) fieldsToUpdate.name = updates.name;
-  
   if (updates.mobileNumber !== undefined) {
-    fieldsToUpdate.mobileNumber = updates.mobileNumber.trim() === '' ? null : updates.mobileNumber.trim();
+    fieldsToUpdate.mobileNumber = updates.mobileNumber === null || updates.mobileNumber.trim() === '' ? null : updates.mobileNumber.trim();
   }
-  
   if (updates.facebookProfileUrl !== undefined) {
-    fieldsToUpdate.facebookProfileUrl = updates.facebookProfileUrl.trim() === '' ? null : updates.facebookProfileUrl.trim();
+    fieldsToUpdate.facebookProfileUrl = updates.facebookProfileUrl === null || updates.facebookProfileUrl.trim() === '' ? null : updates.facebookProfileUrl.trim();
   }
+
+  // Admin App Settings
+  if (updates.enableSchemaCheckOnStartup !== undefined) fieldsToUpdate.enableSchemaCheckOnStartup = updates.enableSchemaCheckOnStartup;
+  if (updates.enableDataFetchOnStartup !== undefined) fieldsToUpdate.enableDataFetchOnStartup = updates.enableDataFetchOnStartup;
+
+
+  // Sales Invoice Defaults
+  if (updates.defaultSalesPaymentStatus !== undefined) fieldsToUpdate.defaultSalesPaymentStatus = updates.defaultSalesPaymentStatus;
+  if (updates.defaultSalesInvoiceDateOffset !== undefined) fieldsToUpdate.defaultSalesInvoiceDateOffset = updates.defaultSalesInvoiceDateOffset;
+  if (updates.defaultSalesDueDateOffset !== undefined) fieldsToUpdate.defaultSalesDueDateOffset = updates.defaultSalesDueDateOffset;
+  if (updates.defaultSalesCompanyProfileId !== undefined) fieldsToUpdate.defaultSalesCompanyProfileId = updates.defaultSalesCompanyProfileId;
+  if (updates.defaultSalesDiscountType !== undefined) fieldsToUpdate.defaultSalesDiscountType = updates.defaultSalesDiscountType;
+  if (updates.defaultSalesDiscountValue !== undefined) fieldsToUpdate.defaultSalesDiscountValue = updates.defaultSalesDiscountValue; 
+  if (updates.defaultSalesTaxType !== undefined) fieldsToUpdate.defaultSalesTaxType = updates.defaultSalesTaxType;
+  if (updates.defaultSalesTaxValue !== undefined) fieldsToUpdate.defaultSalesTaxValue = updates.defaultSalesTaxValue; 
+  if (updates.defaultSalesPaymentMethod !== undefined) fieldsToUpdate.defaultSalesPaymentMethod = updates.defaultSalesPaymentMethod;
+  if (updates.defaultSalesPaymentNotes !== undefined) fieldsToUpdate.defaultSalesPaymentNotes = updates.defaultSalesPaymentNotes;
+  if (updates.defaultSalesInvoiceNotes !== undefined) fieldsToUpdate.defaultSalesInvoiceNotes = updates.defaultSalesInvoiceNotes;
+
+
+  // Purchase Bill Defaults
+  if (updates.defaultPurchaseBillDateOffset !== undefined) fieldsToUpdate.defaultPurchaseBillDateOffset = updates.defaultPurchaseBillDateOffset;
+  if (updates.defaultPurchaseDueDateOffset !== undefined) fieldsToUpdate.defaultPurchaseDueDateOffset = updates.defaultPurchaseDueDateOffset;
+  if (updates.defaultPurchaseCompanyProfileId !== undefined) fieldsToUpdate.defaultPurchaseCompanyProfileId = updates.defaultPurchaseCompanyProfileId;
+  if (updates.defaultPurchaseDiscountType !== undefined) fieldsToUpdate.defaultPurchaseDiscountType = updates.defaultPurchaseDiscountType;
+  if (updates.defaultPurchaseDiscountValue !== undefined) fieldsToUpdate.defaultPurchaseDiscountValue = updates.defaultPurchaseDiscountValue; 
+  if (updates.defaultPurchaseTaxType !== undefined) fieldsToUpdate.defaultPurchaseTaxType = updates.defaultPurchaseTaxType;
+  if (updates.defaultPurchaseTaxValue !== undefined) fieldsToUpdate.defaultPurchaseTaxValue = updates.defaultPurchaseTaxValue; 
 
 
   if (Object.keys(fieldsToUpdate).length === 0) {
@@ -258,7 +288,7 @@ export const updateUserProfile = async (userId: string, userEmail: string, updat
   }
 
   try {
-    if (fieldsToUpdate.mobileNumber) {
+    if (fieldsToUpdate.mobileNumber && fieldsToUpdate.mobileNumber.trim() !== '') {
       const existingUsersWithMobile = await apiService.fetchRecords<User>(
         'users', 
         userEmail, 

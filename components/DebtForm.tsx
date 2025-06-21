@@ -1,23 +1,11 @@
-
 import React, { useState, FormEvent, useRef, useEffect } from 'react';
-import { Debt, DebtType, Person, FormPurpose } from '../types'; 
-import { BN_UI_TEXT } from '../constants';
+import { Debt, DebtType, Person, FormPurpose, DebtFormSubmitData } from '../types'; // Updated paths
+import { BN_UI_TEXT } from '../constants'; // Updated path
 import UsersIcon from './icons/UsersIcon';
-import { useNotification } from '../contexts/NotificationContext'; // Import useNotification
-
-interface DebtFormSubmitPayload {
-  personNameValue: string;
-  explicitSelectedPersonId?: string | null;
-  amount: number;
-  description: string;
-  formPurpose: FormPurpose;
-  debtType?: DebtType; 
-  dueDate?: string;    
-  paymentDate?: string; 
-}
+import { useNotification } from '../contexts/NotificationContext'; 
 
 interface DebtFormProps {
-  onAddDebt: (debtData: DebtFormSubmitPayload) => void; 
+  onAddDebt: (debtData: DebtFormSubmitData) => void; 
   showTitle?: boolean;
   persons: Person[];
   debts: Debt[]; 
@@ -54,7 +42,7 @@ const DebtForm: React.FC<DebtFormProps> = ({
   const [displayBalanceInfo, setDisplayBalanceInfo] = useState<DisplayBalanceInfo | null>(null);
   const [calculatedNetBalance, setCalculatedNetBalance] = useState<number>(0);
   const prevPersonIdRef = useRef<string | null>(null);
-  const { addNotification } = useNotification(); // Use notification hook
+  const { addNotification } = useNotification(); 
 
 
   useEffect(() => {
@@ -198,7 +186,7 @@ const DebtForm: React.FC<DebtFormProps> = ({
       return;
     }
 
-    const payload: DebtFormSubmitPayload = {
+    const payload: DebtFormSubmitData = {
       personNameValue: personNameValue.trim(),
       explicitSelectedPersonId: personIdFromSelection, 
       amount: numAmount,

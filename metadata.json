@@ -1,6 +1,5 @@
 {
   "requestFramePermissions": [
-    "camera",
     "microphone"
   ],
   "name": "দৈনিক আয়-ব্যয় ট্র্যাকার (Daily Spending & Earning Tracker)",
