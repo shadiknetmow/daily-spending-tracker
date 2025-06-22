@@ -84,7 +84,7 @@ export const authTexts = {
   FACEBOOK_PROFILE_URL_PLACEHOLDER: "https://facebook.com/yourprofile",
   INVALID_FACEBOOK_URL: "অনুগ্রহ করে একটি সঠিক ফেসবুক প্রোফাইল ইউআরএল দিন।",
   WELCOME_TO_APP_MAIN_TITLE: "অ্যাপে স্বাগতম!",
-  WELCOME_TO_APP_SUBTITLE: "আপনার দৈনন্দিন আয় এবং ব্যয়ের হিসাব সহজে ট্র্যাক করুন এবং আর্থিক ভাবে আরও منظم হোন।",
+  WELCOME_TO_APP_SUBTITLE: "আজই শুরু করুন আপনার আয় ও ব্যয় নিয়ন্ত্রণের যাত্রা — হোন আর্থিকভাবে সুসংগঠিত ও আত্মনির্ভরশীল!",
   KEY_FEATURES_TITLE: "আমাদের প্রধান বৈশিষ্ট্যসমূহ:",
   FEATURE_TRANSACTION_TRACKING_TITLE: "দৈনিক আয়-ব্যয় ট্র্যাকিং",
   FEATURE_TRANSACTION_TRACKING_DESC: "সহজেই আপনার প্রতিদিনের আয় এবং ব্যয় রেকর্ড করুন।",

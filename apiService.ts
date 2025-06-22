@@ -2,7 +2,7 @@
 import { User, UserSuggestion, Invoice, InvoiceType, InvoicePaymentMethod, BankAccount } from '../types'; // Added BankAccount
 import bcrypt from 'bcryptjs'; // Import bcrypt
 
-const API_BASE_URL = 'https://api.medha4u.com/';
+const API_BASE_URL = 'https://live.medha4u.com/';
 const ACCESS_TOKEN = 'DzhIpz0ALDkOKCx6Bqvg4RYNgrwQWpyk';
 
 interface ColumnDefinition {

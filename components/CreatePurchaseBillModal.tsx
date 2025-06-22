@@ -1480,8 +1480,7 @@ const CreatePurchaseBillModal: React.FC<CreatePurchaseBillModalProps> = ({
                   )}
                 </div>
               </div>
-              );
-            })}
+              ))}
           </div>
           <button type="button" onClick={addItem}
                   className={`w-full text-teal-600 hover:text-teal-700 font-medium py-2 px-3 border-2 border-dashed border-teal-300 hover:border-teal-400 rounded-md flex items-center justify-center space-x-1.5 transition-colors ${getFontSizeClass('header')}`}>
