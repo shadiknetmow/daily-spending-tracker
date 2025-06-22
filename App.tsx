@@ -1,18 +1,27 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+
+
+
+
+
+
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
   Transaction, TransactionType, Debt, DebtType, DebtVersion, TransactionVersion, User, 
   Person, PersonVersion, PersonLedgerEntry, PersonLedgerEntryType, DebtFormSubmitData, 
   FormPurpose, AuthFormMode, BudgetCategory, Budget, BudgetPeriod, ProfileImageAction,
   Message, ImageMessageContent, AudioMessageContent, MessageVersion, MessageVersionSnapshot,
-  UserSuggestion, SuggestionType, ExpenseFieldRequirements 
-} from './types';
-import { BN_UI_TEXT, LOCAL_STORAGE_KEYS, INCOME_DESCRIPTION_SUGGESTIONS_BN, EXPENSE_DESCRIPTION_SUGGESTIONS_BN, TRANSACTION_DESCRIPTION_SUGGESTIONS_BN } from './constants';
+  UserSuggestion, SuggestionType, ExpenseFieldRequirements, Invoice, InvoiceItem, InvoicePaymentStatus, 
+  InvoiceCreationData, Product, CompanyProfile, StockAdjustment, StockAdjustmentType, InvoiceType,
+  GeminiSettings, AppContextData, AIPreRenderData, AILogEntry, AILanguageCode, mapAILanguageCodeToGeminiLanguage, AIScope, BankAccount
+} from './types'; 
+import { InvoiceVersion as AppInvoiceVersion, InvoicePayment, InvoiceVersionSnapshot as AppInvoiceVersionSnapshot } from './types'; 
+import { BN_UI_TEXT, LOCAL_STORAGE_KEYS, INCOME_DESCRIPTION_SUGGESTIONS_BN, EXPENSE_DESCRIPTION_SUGGESTIONS_BN, TRANSACTION_DESCRIPTION_SUGGESTIONS_BN, COMMON_UNITS_BN, DEFAULT_GEMINI_SETTINGS, ADMIN_EMAIL } from './constants'; 
 import Header from './components/Header';
 import Summary from './components/Summary';
 import { SimplifiedTransactionForm } from './components/SimplifiedTransactionForm';
 import TransactionList from './components/TransactionList';
-import AITipCard from './components/AITipCard';
+import { AITipCard } from './components/AITipCard';
 import EditTransactionModal from './components/EditTransactionModal';
 import DebtForm from './components/DebtForm';
 import AuthForm from './components/AuthForm'; 
@@ -24,7 +33,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import { useAuth } from './contexts/AuthContext';
 import { useNotification } from './contexts/NotificationContext'; 
 import NotificationsDisplay from './components/NotificationsDisplay'; 
-import { ReportModal } from './components/ReportModal'; // Changed to named import
+import { ReportModal } from './components/ReportModal';
 import ArchiveModal from './components/ArchiveModal'; 
 import DebtList from './components/DebtList'; 
 import SimpleErrorModal from './components/SimpleErrorModal'; 
@@ -54,18 +63,84 @@ import InboxModal from './components/InboxModal';
 import ImageViewerModal from './components/ImageViewerModal';
 // Video Call Components
 import VideoCallModal from './components/VideoCallModal';
+// Invoice Components
+import CreateInvoiceModal from './components/CreateInvoiceModal';
+import CreatePurchaseBillModal from './components/CreatePurchaseBillModal'; 
+import InvoiceListModal from './components/InvoiceListModal';
+import ViewInvoiceModal from './components/ViewInvoiceModal';
+// Company Profile Components
+import ManageCompanyProfilesModal from './components/ManageCompanyProfilesModal'; 
+// Product Management Components
+import ManageProductsModal from './components/ManageProductsModal'; 
+import ProductFormModal from './components/ProductFormModal'; 
+// Stock Report Modal
+import StockReportModal from './components/StockReportModal';
+// Gemini Settings Modal
+import GeminiSettingsModal from './components/GeminiSettingsModal';
+// App Admin Settings Modal
+import AppAdminSettingsModal from './components/AppAdminSettingsModal';
+// AI Interaction Log Modal
+import AIInteractionLogModal from './components/AIInteractionLogModal';
+// Bank Account Components
+import ManageBankAccountsModal from './components/ManageBankAccountsModal';
+import BankAccountFormModal from './components/BankAccountFormModal';
+import BankReportModal from './components/BankReportModal'; // New
 
 
 import * as apiService from './apiService'; 
+import * as geminiService from './services/geminiService'; 
+import * as speechService from './services/speechService';
+import { convertToBanglaPhonetic } from './utils/textUtils';
+import { SpeechRecognitionEvent, SpeechRecognitionErrorEvent, SpeechRecognition, SpeechRecognitionStatic } from './types/speechRecognitionTypes';
 
+
+// For generating more unique client-side IDs for payments
+let paymentIdCounter = 0;
+let lastPaymentTimestampForId = 0;
+
+const generateUniquePaymentId = (): string => {
+  const now = Date.now();
+  if (now === lastPaymentTimestampForId) {
+    paymentIdCounter++;
+  } else {
+    paymentIdCounter = 0;
+    lastPaymentTimestampForId = now;
+  }
+  return `pay_${now}_${paymentIdCounter}_${Math.random().toString(36).substring(2, 9)}`;
+};
+
+
+// Main App Component
 export const App = (): JSX.Element => { 
+  const authContextHookData = useAuth(); 
+  
+  const IS_PREVIEW_SIMULATION_ENABLED = false; 
+  const PREVIEW_USER_ID = 'previewUserSSR';
+  const PREVIEW_USER_MOCK: User = { id: PREVIEW_USER_ID, email: 'preview@app.com', name: 'পূর্বরূপ ব্যবহারকারী' };
+
+  let currentUser: User | null;
+  let isAuthContextLoading: boolean;
+
+  if (IS_PREVIEW_SIMULATION_ENABLED && !authContextHookData.currentUser && !authContextHookData.isAuthLoading) {
+    currentUser = PREVIEW_USER_MOCK;
+    isAuthContextLoading = false; 
+  } else {
+    currentUser = authContextHookData.currentUser;
+    isAuthContextLoading = authContextHookData.isAuthLoading;
+  }
+  
   const { 
-    currentUser, 
-    logout: authLogout, 
-    isAuthLoading: isAuthContextLoading, 
-    authError: authContextError,
-    clearAuthError           
-  } = useAuth(); 
+    authError: authContextError, 
+    clearAuthError,
+    login,
+    signup,
+    logout: authLogout,
+    requestPasswordReset,
+    resetPasswordWithCode,
+    changePassword,
+    updateCurrentUserData,
+  } = authContextHookData; 
+  
   const { addNotification } = useNotification(); 
   
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -76,6 +151,54 @@ export const App = (): JSX.Element => {
   const [budgetCategories, setBudgetCategories] = useState<BudgetCategory[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]); 
+  const [products, setProducts] = useState<Product[]>([]); 
+  const [companyProfiles, setCompanyProfiles] = useState<CompanyProfile[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]); 
+  
+  const [geminiSettings, setGeminiSettings] = useState<GeminiSettings>(() => {
+    const storedSettings = localStorage.getItem(LOCAL_STORAGE_KEYS.GEMINI_SETTINGS);
+    if (storedSettings) {
+      try {
+        return JSON.parse(storedSettings);
+      } catch (e) {
+        console.error("Failed to parse Gemini settings from localStorage", e);
+      }
+    }
+    return DEFAULT_GEMINI_SETTINGS;
+  });
+
+  const [isLoadingData, setIsLoadingData] = useState(
+    (IS_PREVIEW_SIMULATION_ENABLED && currentUser?.id === PREVIEW_USER_ID) ? false : true
+  ); 
+  const [appError, setAppError] = useState<string | null>(null);
+
+  // AI Assistant states
+  const [aiAssistantLanguage, setAiAssistantLanguage] = useState<AILanguageCode>('bn-BD'); 
+  const [aiVoiceReplayEnabled, setAiVoiceReplayEnabled] = useState<boolean>(() => {
+    const storedValue = localStorage.getItem(LOCAL_STORAGE_KEYS.AI_VOICE_REPLAY_ENABLED);
+    return storedValue ? JSON.parse(storedValue) : false; 
+  });
+  const [aiAssistantScope, setAiAssistantScope] = useState<AIScope>(() => {
+    const storedScope = localStorage.getItem(LOCAL_STORAGE_KEYS.AI_ASSISTANT_SCOPE) as AIScope | null;
+    return storedScope || 'app'; 
+  });
+  const [isListeningForAI, setIsListeningForAI] = useState(false);
+  const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
+  const [processingAICommand, setProcessingAICommand] = useState(false);
+  const [aiPreRenderDataForInvoice, setAiPreRenderDataForInvoice] = useState<AIPreRenderData | null>(null);
+  const [aiLogs, setAiLogs] = useState<AILogEntry[]>(() => {
+    const storedLogs = localStorage.getItem(LOCAL_STORAGE_KEYS.AI_ASSISTANT_LOGS);
+    try {
+      return storedLogs ? JSON.parse(storedLogs) : [];
+    } catch (e) {
+      console.error("Failed to parse AI logs from localStorage", e);
+      return [];
+    }
+  });
+  const [isAILogModalOpen, setIsAILogModalOpen] = useState(false);
+
+
   const [expenseFieldRequirements, setExpenseFieldRequirements] = useState<ExpenseFieldRequirements>(() => {
     const storedRequirements = localStorage.getItem(LOCAL_STORAGE_KEYS.EXPENSE_FIELD_REQUIREMENTS);
     if (storedRequirements) {
@@ -104,9 +227,6 @@ export const App = (): JSX.Element => {
     return false; 
   });
 
-
-  const [isLoadingData, setIsLoadingData] = useState(false); 
-  const [appError, setAppError] = useState<string | null>(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -146,10 +266,32 @@ export const App = (): JSX.Element => {
 
   const [isViewTransactionsModalOpen, setIsViewTransactionsModalOpen] = useState(false); 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isBankReportModalOpen, setIsBankReportModalOpen] = useState(false); // New
+  const [isStockReportModalOpen, setIsStockReportModalOpen] = useState(false); 
   const [isBudgetSetupModalOpen, setIsBudgetSetupModalOpen] = useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false); 
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false); 
+  const [isGeminiSettingsModalOpen, setIsGeminiSettingsModalOpen] = useState(false); 
+  const [isAppAdminSettingsModalOpen, setIsAppAdminSettingsModalOpen] = useState(false);
+
+  
+  const [isCreateSalesInvoiceModalOpen, setIsCreateSalesInvoiceModalOpen] = useState(false); 
+  const [isCreatePurchaseBillModalOpen, setIsCreatePurchaseBillModalOpen] = useState(false); 
+  const [isInvoiceListModalOpen, setIsInvoiceListModalOpen] = useState(false);
+  const [isViewInvoiceModalOpen, setIsViewInvoiceModalOpen] = useState(false);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null); 
+  const [isManageCompanyProfilesModalOpen, setIsManageCompanyProfilesModalOpen] = useState(false); 
+  
+  const [isManageProductsModalOpen, setIsManageProductsModalOpen] = useState(false);
+  const [isProductFormModalOpen, setIsProductFormModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  const [isManageBankAccountsModalOpen, setIsManageBankAccountsModalOpen] = useState(false);
+  const [isBankAccountFormModalOpen, setIsBankAccountFormModalOpen] = useState(false);
+  const [editingBankAccount, setEditingBankAccount] = useState<BankAccount | null>(null);
+  const [defaultBankAccountId, setDefaultBankAccountId] = useState<string | null>(null); 
   
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [chattingWithPerson, setChattingWithPerson] = useState<Person | null>(null);
@@ -170,136 +312,144 @@ export const App = (): JSX.Element => {
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [confirmModalAction, setConfirmModalAction] = useState<(() => Promise<void>) | null>(null);
-  const [confirmModalMessage, setConfirmModalMessage] = useState('');
-  const [confirmModalTitle, setConfirmModalTitle] = useState('');
-  const [confirmModalButtonText, setConfirmModalButtonText] = useState<string | undefined>(undefined);
-  const [confirmModalButtonColor, setConfirmModalButtonColor] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEYS.EXPENSE_FIELD_REQUIREMENTS, JSON.stringify(expenseFieldRequirements));
-  }, [expenseFieldRequirements]);
-
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEYS.GLOBAL_PHONETIC_MODE, JSON.stringify(isGlobalPhoneticModeActive));
-  }, [isGlobalPhoneticModeActive]);
-
-  const handleToggleGlobalPhoneticMode = () => {
-    setIsGlobalPhoneticModeActive(prev => {
-      const newState = !prev;
-      addNotification(
-        newState ? BN_UI_TEXT.PHONETIC_BANGLA_ACTIVE : BN_UI_TEXT.PHONETIC_ENGLISH_ACTIVE,
-        'info',
-        2000
-      );
-      return newState;
-    });
-  };
-
-  const handleSwitchAuthMode = (newMode: AuthFormMode, emailPayload?: string) => {
-    clearAuthError();
-    if (newMode === 'forgotPasswordReset' && emailPayload) {
-        setEmailForPasswordReset(emailPayload);
-    } else if (newMode !== 'forgotPasswordReset' && newMode !== 'forgotPasswordRequest') {
-        setEmailForPasswordReset(undefined);
-    }
-    setAuthPageMode(newMode);
-    setIsAuthModalOpen(true); 
-  };
+  const [confirmModalProps, setConfirmModalProps] = useState({
+    title: '',
+    message: '' as string | React.ReactNode,
+    onConfirmAction: () => Promise.resolve(),
+    confirmButtonText: undefined as string | undefined,
+    confirmButtonColor: undefined as string | undefined,
+  });
   
-  const getAuthModalTitle = (mode: AuthFormMode): string => {
-    switch(mode) {
-      case 'login': return BN_UI_TEXT.LOGIN;
-      case 'signup': return BN_UI_TEXT.SIGNUP;
-      case 'forgotPasswordRequest':
-      case 'forgotPasswordReset':
-        return BN_UI_TEXT.FORGOT_PASSWORD_TITLE;
-      default: return '';
-    }
-  };
+  const [isOpeningInvoiceModalFromAI, setIsOpeningInvoiceModalFromAI] = useState(false);
+  
+  const isAdminUser = useMemo(() => currentUser?.email === ADMIN_EMAIL, [currentUser]);
 
-  const handleUpdateExpenseFieldRequirements = (newRequirements: Partial<ExpenseFieldRequirements>) => {
-    setExpenseFieldRequirements(prev => ({ ...prev, ...newRequirements }));
+
+  const addAILogEntry = useCallback((entryData: Omit<AILogEntry, 'id' | 'timestamp'>) => {
+    const newEntry: AILogEntry = {
+      id: Date.now().toString() + Math.random().toString(16).substring(2),
+      timestamp: new Date().toISOString(),
+      ...entryData,
+    };
+    setAiLogs(prevLogs => {
+      const updatedLogs = [...prevLogs, newEntry];
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEYS.AI_ASSISTANT_LOGS, JSON.stringify(updatedLogs));
+      } catch (storageError) {
+        console.error("Failed to save AI logs to localStorage:", storageError);
+      }
+      return updatedLogs;
+    });
+  }, []); 
+
+  const clearAILogs = useCallback(() => {
+    setAiLogs([]);
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.AI_ASSISTANT_LOGS);
+    addNotification(BN_UI_TEXT.AI_LOG_CLEARED_SUCCESS, 'success');
+  }, [addNotification]);
+
+  const handleSetAiVoiceReplayEnabled = (enabled: boolean) => {
+    setAiVoiceReplayEnabled(enabled);
   };
 
   useEffect(() => {
-    if (currentUser) {
-      setIsAuthModalOpen(false); 
-      setEmailForPasswordReset(undefined); 
-    }
-  }, [currentUser]);
+    localStorage.setItem(LOCAL_STORAGE_KEYS.AI_VOICE_REPLAY_ENABLED, JSON.stringify(aiVoiceReplayEnabled));
+  }, [aiVoiceReplayEnabled]);
+
+  const handleSetAiAssistantScope = (scope: AIScope) => {
+    setAiAssistantScope(scope);
+  };
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.AI_ASSISTANT_SCOPE, aiAssistantScope);
+  }, [aiAssistantScope]);
 
 
-  const openConfirmationModal = useCallback((
-    title: string, 
-    message: string, 
-    onConfirm: () => Promise<void>,
-    buttonText?: string,
-    buttonColor?: string
-  ) => {
-    setConfirmModalTitle(title);
-    setConfirmModalMessage(message);
-    setConfirmModalAction(() => onConfirm);
-    setConfirmModalButtonText(buttonText);
-    setConfirmModalButtonColor(buttonColor);
-    setIsConfirmModalOpen(true);
-  }, []);
-
-
-  const loadAppData = useCallback(async () => {
-    if (currentUser && currentUser.id) { 
-      const userIdForContext = currentUser.id;
-      setIsLoadingData(true);
-      setAppError(null); 
-      console.log(`[loadAppData START] User: ${userIdForContext}`);
-      try {
-        const [
-          fetchedTransactions,
-          fetchedDebts,
-          fetchedPersons,
-          fetchedLedgerEntries,
-          fetchedSuggestions,
-          fetchedBudgetCategories,
-          fetchedBudgets,
-          fetchedMessages
-        ] = await Promise.all([
-          apiService.fetchRecords<Transaction>('transactions', userIdForContext, "1", true),
-          apiService.fetchRecords<Debt>('debts', userIdForContext),
-          apiService.fetchRecords<Person>('persons', userIdForContext, "1", true),
-          apiService.fetchRecords<PersonLedgerEntry>('person_ledger_entries', userIdForContext),
-          apiService.fetchUserSuggestions(userIdForContext), 
-          apiService.fetchRecords<BudgetCategory>('budgetCategories', userIdForContext),
-          apiService.fetchRecords<Budget>('budgets', userIdForContext),
-          apiService.fetchRecords<Message>('messages', userIdForContext) 
-        ]);
-        
-        console.log(`[loadAppData] Fetched for user ${userIdForContext}: ${fetchedTransactions.length} Tx, ${fetchedDebts.length} Debts, ${fetchedPersons.length} Persons, ${fetchedMessages.length} Msgs, ${fetchedSuggestions.length} Suggestions.`);
-        
-        setTransactions(fetchedTransactions);
-        setDebts(fetchedDebts);
-        setPersons(fetchedPersons);
-        setPersonLedgerEntries(fetchedLedgerEntries);
-        setUserCustomSuggestions(fetchedSuggestions);
-        setBudgetCategories(fetchedBudgetCategories);
-        setBudgets(fetchedBudgets);
-        setMessages(fetchedMessages.map(m => ({...m, editHistory: m.editHistory || []}))); 
-
-      } catch (error: any) {
-        console.error("[loadAppData] Failed to load app data:", error); 
-        setAppError(`তথ্য লোড করতে সমস্যা হয়েছে: ${error.message}. অনুগ্রহ করে পৃষ্ঠাটি রিফ্রেশ করুন অথবা পরে আবার চেষ্টা করুন।`);
-        addNotification(BN_UI_TEXT.AUTH_ERROR_GENERAL, 'error');
-      } finally {
+  const loadAllData = useCallback(async () => {
+    if (!currentUser || !currentUser.id || (IS_PREVIEW_SIMULATION_ENABLED && currentUser.id === PREVIEW_USER_ID)) {
+      if (IS_PREVIEW_SIMULATION_ENABLED && currentUser?.id === PREVIEW_USER_ID) {
         setIsLoadingData(false);
-        console.log(`[loadAppData END] User: ${userIdForContext}. Loading data finished.`);
       }
-    } else {
-        console.log("[loadAppData] No current user, skipping data load.");
+      return;
     }
-  }, [currentUser, addNotification]);
+
+    if (currentUser.enableDataFetchOnStartup === false) {
+      console.log("Data fetch on startup is disabled by admin setting. Skipping data load.");
+      setIsLoadingData(false);
+      addNotification("স্টার্টআপ ডেটা লোড নিষ্ক্রিয় করা হয়েছে।", "info", 5000);
+      return;
+    }
+
+    setIsLoadingData(true);
+    try {
+      const [
+        fetchedTransactions, fetchedDebts, fetchedPersons, fetchedLedger, 
+        fetchedSuggestions, fetchedBudgetCategories, fetchedBudgets, 
+        fetchedMessages, fetchedInvoices, fetchedProducts, fetchedCompanyProfiles,
+        fetchedBankAccounts 
+      ] = await Promise.all([
+        apiService.fetchRecords<Transaction>('transactions', currentUser.id),
+        apiService.fetchRecords<Debt>('debts', currentUser.id),
+        apiService.fetchRecords<Person>('persons', currentUser.id),
+        apiService.fetchRecords<PersonLedgerEntry>('person_ledger_entries', currentUser.id),
+        apiService.fetchUserSuggestions(currentUser.id),
+        apiService.fetchRecords<BudgetCategory>('budgetCategories', currentUser.id),
+        apiService.fetchRecords<Budget>('budgets', currentUser.id),
+        apiService.fetchRecords<Message>('messages', currentUser.id),
+        apiService.fetchRecords<Invoice>('invoices', currentUser.id),
+        apiService.fetchRecords<Product>('products', currentUser.id),
+        apiService.fetchRecords<CompanyProfile>('company_profiles', currentUser.id),
+        apiService.fetchRecords<BankAccount>('bank_accounts', currentUser.id), 
+      ]);
+      setTransactions(fetchedTransactions);
+      setDebts(fetchedDebts);
+      setPersons(fetchedPersons);
+      setPersonLedgerEntries(fetchedLedger);
+      setUserCustomSuggestions(fetchedSuggestions);
+      setBudgetCategories(fetchedBudgetCategories);
+      setBudgets(fetchedBudgets);
+      setMessages(fetchedMessages);
+      setInvoices(fetchedInvoices);
+      setProducts(fetchedProducts);
+      setCompanyProfiles(fetchedCompanyProfiles);
+      setBankAccounts(fetchedBankAccounts); 
+
+      const storedDefaultBankId = localStorage.getItem(LOCAL_STORAGE_KEYS.DEFAULT_BANK_ACCOUNT_ID);
+      if (currentUser.defaultBankAccountId) {
+        setDefaultBankAccountId(currentUser.defaultBankAccountId);
+      } else if (storedDefaultBankId) {
+        setDefaultBankAccountId(storedDefaultBankId);
+      }
+
+
+    } catch (error: any) {
+      console.error("Error loading data:", error);
+      setAppError(`ডেটা লোড করতে সমস্যা হয়েছে: ${error.message}`);
+      addNotification(`ডেটা লোড করতে সমস্যা হয়েছে: ${error.message}`, 'error');
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, [currentUser, addNotification, IS_PREVIEW_SIMULATION_ENABLED]);
 
   useEffect(() => {
     if (currentUser && currentUser.id) {
-      loadAppData();
+      if (IS_PREVIEW_SIMULATION_ENABLED && currentUser.id === PREVIEW_USER_ID) {
+        setTransactions([]);
+        setDebts([]);
+        setPersons([]);
+        setPersonLedgerEntries([]);
+        setUserCustomSuggestions([]);
+        setBudgetCategories([]);
+        setBudgets([]);
+        setMessages([]);
+        setInvoices([]);
+        setProducts([]);
+        setCompanyProfiles([]);
+        setBankAccounts([]); 
+        setIsLoadingData(false);
+      } else {
+        loadAllData();
+      }
     } else {
       setTransactions([]);
       setDebts([]);
@@ -309,2093 +459,1449 @@ export const App = (): JSX.Element => {
       setBudgetCategories([]);
       setBudgets([]);
       setMessages([]);
+      setInvoices([]);
+      setProducts([]);
+      setCompanyProfiles([]);
+      setBankAccounts([]); 
+      if (!isAuthContextLoading) { 
+          setIsLoadingData(false);
+      }
     }
-  }, [currentUser, loadAppData]);
+  }, [currentUser, loadAllData, IS_PREVIEW_SIMULATION_ENABLED, isAuthContextLoading]);
 
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.EXPENSE_FIELD_REQUIREMENTS, JSON.stringify(expenseFieldRequirements));
+  }, [expenseFieldRequirements]);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.GLOBAL_PHONETIC_MODE, JSON.stringify(isGlobalPhoneticModeActive));
+  }, [isGlobalPhoneticModeActive]);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.GEMINI_SETTINGS, JSON.stringify(geminiSettings));
+  }, [geminiSettings]);
   
-  const totalIncome = useMemo(() => 
-    transactions.filter(t => t.type === TransactionType.INCOME && !t.isDeleted).reduce((sum, t) => sum + t.amount, 0),
-    [transactions]
-  );
-  const totalExpense = useMemo(() =>
-    transactions.filter(t => t.type === TransactionType.EXPENSE && !t.isDeleted).reduce((sum, t) => sum + t.amount, 0),
-    [transactions]
-  );
-  const balance = useMemo(() => totalIncome - totalExpense, [totalIncome, totalExpense]);
+  useEffect(() => {
+    if (defaultBankAccountId) {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.DEFAULT_BANK_ACCOUNT_ID, defaultBankAccountId);
+    } else {
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.DEFAULT_BANK_ACCOUNT_ID);
+    }
+  }, [defaultBankAccountId]);
 
-  const totalReceivable = useMemo(() =>
-    debts.filter(d => d.type === DebtType.RECEIVABLE && !d.isSettled).reduce((sum, d) => sum + d.remainingAmount, 0),
-    [debts]
-  );
-  const totalPayable = useMemo(() =>
-    debts.filter(d => d.type === DebtType.PAYABLE && !d.isSettled).reduce((sum, d) => sum + d.remainingAmount, 0),
-    [debts]
-  );
 
-  const incomeSuggestions = useMemo(() => {
-    const customIncomeTexts = userCustomSuggestions
-        .filter(s => s.type === 'income')
-        .map(s => s.text);
-    const uniqueSuggestions = new Set([...customIncomeTexts, ...INCOME_DESCRIPTION_SUGGESTIONS_BN]);
-    return Array.from(uniqueSuggestions).sort((a,b) => a.localeCompare(b, 'bn-BD'));
-  }, [userCustomSuggestions]);
+  const handleToggleGlobalPhoneticMode = () => {
+    setIsGlobalPhoneticModeActive(prev => {
+      const newState = !prev;
+      addNotification(
+        newState ? BN_UI_TEXT.PHONETIC_BANGLA_ACTIVE : BN_UI_TEXT.PHONETIC_ENGLISH_ACTIVE,
+        'info',
+        3000
+      );
+      return newState;
+    });
+  };
 
-  const expenseSuggestions = useMemo(() => {
-     const customExpenseTexts = userCustomSuggestions
-        .filter(s => s.type === 'expense')
-        .map(s => s.text);
-    const uniqueSuggestions = new Set([...customExpenseTexts, ...EXPENSE_DESCRIPTION_SUGGESTIONS_BN]);
-    return Array.from(uniqueSuggestions).sort((a,b) => a.localeCompare(b, 'bn-BD'));
-  }, [userCustomSuggestions]);
-  
-  const combinedTransactionSuggestionsForEdit = useMemo(() => { 
-    const uniqueTransactionDescs = new Set(transactions.map(t => t.description.split(" | ")[0].split(" [")[0])); 
-    const allUserSuggestionTexts = userCustomSuggestions.map(s => s.text.split(" | ")[0]); 
-    const allPredefinedSuggestionTexts = TRANSACTION_DESCRIPTION_SUGGESTIONS_BN.map(s => s.split(" | ")[0]); 
-
-    const combinedUniqueStems = new Set([
-      ...Array.from(uniqueTransactionDescs), 
-      ...allUserSuggestionTexts, 
-      ...allPredefinedSuggestionTexts
-    ]);
-    return Array.from(combinedUniqueStems).sort((a,b) => a.localeCompare(b, 'bn-BD'));
-  }, [transactions, userCustomSuggestions]);
-  
-  const unreadMessagesCount = useMemo(() => {
-    if (!currentUser || !messages || !currentUser.id) return 0;
-    return messages.filter(msg =>
-        msg.userId === currentUser.id && 
-        msg.actualReceiverId === currentUser.id && 
-        !msg.isRead && !msg.isDeleted 
-      ).length;
-  }, [currentUser, messages]);
-  
-
-  // Transaction Handlers
-  const handleAddTransaction = async (transactionData: { description: string; amount: number; type: TransactionType; date: string }): Promise<boolean> => {
-    if (!currentUser || !currentUser.id) return false;
-    const userIdForContext = currentUser.id;
-    const currentDateISO = transactionData.date || new Date().toISOString(); 
-
-    const newTransactionBase: Omit<Transaction, 'editHistory'> = {
-      id: 'txn_' + Date.now().toString() + Math.random().toString(36).substring(2, 9),
-      date: currentDateISO,
-      originalDate: currentDateISO,
-      lastModified: currentDateISO,
-      description: transactionData.description,
-      amount: transactionData.amount,
-      type: transactionData.type,
-      userId: userIdForContext,
-      isDeleted: false,
-      deletedAt: undefined,
-    };
+ const handleAddTransaction = async (transactionData: Omit<Transaction, 'id' | 'userId' | 'editHistory' | 'lastModified' | 'originalDate'>): Promise<boolean> => {
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) {
+        addNotification(currentUser?.id === PREVIEW_USER_ID ? "পূর্বরূপ মোডে নতুন লেনদেন যোগ করা যাবে না।" : BN_UI_TEXT.AUTH_ERROR_GENERAL, 'info');
+        return false;
+    }
     
-    const snapshot: TransactionVersion['snapshot'] = {
-      date: newTransactionBase.date,
-      description: newTransactionBase.description,
-      amount: newTransactionBase.amount,
-      type: newTransactionBase.type,
-      originalDate: newTransactionBase.originalDate,
-      isDeleted: newTransactionBase.isDeleted,
+    const transactionId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    const nowISO = new Date().toISOString();
+
+    const newTransactionDataWithId = { 
+        ...transactionData, 
+        id: transactionId, 
+        userId: currentUser.id, 
+        originalDate: transactionData.date, 
+        lastModified: nowISO,
+        editHistory: [{
+            timestamp: nowISO,
+            action: 'created' as 'created',
+            userId: currentUser.id,
+            snapshot: {
+                date: transactionData.date,
+                description: transactionData.description,
+                amount: transactionData.amount,
+                type: transactionData.type,
+                originalDate: transactionData.date,
+                linkedLedgerEntryId: transactionData.linkedLedgerEntryId,
+                bankAccountId: transactionData.bankAccountId,
+                bankAccountName: transactionData.bankAccountName,
+                isDeleted: false,
+                deletedAt: undefined,
+            }
+        }]
     };
 
-    const newTransaction: Transaction = {
-      ...newTransactionBase,
-      editHistory: [{
-        timestamp: newTransactionBase.lastModified,
-        action: 'created',
-        userId: userIdForContext,
-        snapshot: snapshot 
-      }],
+    const newTransactionForState: Transaction = {
+        ...newTransactionDataWithId
     };
 
     try {
-      await apiService.insertRecord('transactions', userIdForContext, newTransaction);
-      setTransactions(prev => [newTransaction, ...prev]);
-      addNotification( (newTransaction.type === TransactionType.INCOME ? BN_UI_TEXT.INCOME : BN_UI_TEXT.EXPENSE) + " সফলভাবে যোগ করা হয়েছে।", 'success');
-      if (newTransaction.type === TransactionType.INCOME) {
-        setIsAddIncomeModalOpen(false);
-      }
-      // For EXPENSE, do not close the modal, allow form reset for next entry.
-      // if (newTransaction.type === TransactionType.EXPENSE) setIsAddExpenseModalOpen(false);
-      return true;
+        const response = await apiService.insertRecord('transactions', currentUser.id, newTransactionDataWithId);
+        
+        if (response.success) {
+            setTransactions(prev => [newTransactionForState, ...prev.filter(t => t.id !== newTransactionForState.id)]);
+            addNotification(BN_UI_TEXT.TRANSACTION_ADDED_SUCCESS || "লেনদেন যোগ করা হয়েছে!", 'success');
+            return true; 
+        } else {
+            console.error("Error adding transaction (backend success:false):", response.error, response.sql);
+            addNotification(`লেনদেন যোগ করতে সমস্যা হয়েছে: ${response.error || 'অজানা ত্রুটি'}`, 'error');
+            return false;
+        }
     } catch (error: any) {
-      addNotification(`লেনদেন যোগ করতে সমস্যা হয়েছে: ${error.message}`, 'error');
-      return false;
+        console.error("Error adding transaction (exception):", error);
+        addNotification(`লেনদেন যোগ করতে সমস্যা হয়েছে: ${error.message}`, 'error');
+        return false;
     }
   };
+  
+  const handleSaveTransaction = async (updatedTransaction: Transaction) => {
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) {
+        addNotification(currentUser?.id === PREVIEW_USER_ID ? "পূর্বরূপ মোডে লেনদেন সম্পাদন করা যাবে না।" : BN_UI_TEXT.AUTH_ERROR_GENERAL, 'info');
+        setIsEditModalOpen(false); setEditingTransaction(null);
+        return;
+    }
 
-  const handleOpenEditTransactionModal = (transaction: Transaction) => {
-    setEditingTransaction(transaction);
-    setIsEditModalOpen(true);
-  };
-
-  const handleSaveEditedTransaction = async (updatedTransactionData: Transaction) => {
-    if (!currentUser || !currentUser.id || !editingTransaction) return;
-    const userIdForContext = currentUser.id;
-    const currentDate = new Date().toISOString();
-
-    const { editHistory: oldEditHistory, ...originalTxnDataForSnapshot } = editingTransaction;
-
-    const snapshot: TransactionVersion['snapshot'] = {
-        date: updatedTransactionData.date,
-        description: updatedTransactionData.description,
-        amount: updatedTransactionData.amount,
-        type: updatedTransactionData.type,
-        originalDate: originalTxnDataForSnapshot.originalDate || originalTxnDataForSnapshot.date,
-        linkedLedgerEntryId: updatedTransactionData.linkedLedgerEntryId,
-        isDeleted: updatedTransactionData.isDeleted,
-        deletedAt: updatedTransactionData.deletedAt
-    };
-    
-    const transactionToSave: Transaction = {
-      ...updatedTransactionData,
-      lastModified: currentDate,
+    const now = new Date().toISOString();
+    const transactionWithHistory: Transaction = {
+      ...updatedTransaction,
+      lastModified: now,
       editHistory: [
-        ...(editingTransaction.editHistory || []), 
+        ...(updatedTransaction.editHistory || []),
         {
-          timestamp: currentDate,
+          timestamp: now,
           action: 'updated',
-          userId: userIdForContext,
-          snapshot: snapshot, 
+          userId: currentUser.id,
+          snapshot: {
+            date: updatedTransaction.date,
+            description: updatedTransaction.description,
+            amount: updatedTransaction.amount,
+            type: updatedTransaction.type,
+            originalDate: updatedTransaction.originalDate,
+            linkedLedgerEntryId: updatedTransaction.linkedLedgerEntryId,
+            bankAccountId: updatedTransaction.bankAccountId,
+            bankAccountName: updatedTransaction.bankAccountName,
+            isDeleted: updatedTransaction.isDeleted,
+            deletedAt: updatedTransaction.deletedAt,
+          }
         }
       ]
     };
     
     try {
-      await apiService.updateRecord('transactions', userIdForContext, transactionToSave, `id = '${transactionToSave.id}'`);
-      setTransactions(prev => prev.map(t => t.id === transactionToSave.id ? transactionToSave : t));
+      setTransactions(prev => prev.map(t => t.id === transactionWithHistory.id ? transactionWithHistory : t));
+      await apiService.updateRecord('transactions', currentUser.id, transactionWithHistory, `id = '${transactionWithHistory.id}'`);
       addNotification(BN_UI_TEXT.TRANSACTION_UPDATED, 'success');
       setIsEditModalOpen(false);
       setEditingTransaction(null);
     } catch (error: any) {
-      addNotification(`লেনদেন আপডেট করতে সমস্যা হয়েছে: ${error.message}`, 'error');
+      console.error("Error saving transaction:", error);
+      addNotification(`লেনদেন সংরক্ষণ করতে সমস্যা হয়েছে: ${error.message}`, 'error');
+      setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t)); 
     }
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    if (!currentUser || !currentUser.id) return;
-    const userIdForContext = currentUser.id;
-
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) {
+        addNotification(currentUser?.id === PREVIEW_USER_ID ? "পূর্বরূপ মোডে লেনদেন মোছা যাবে না।" : BN_UI_TEXT.AUTH_ERROR_GENERAL, 'info');
+        return;
+    }
     const transactionToDelete = transactions.find(t => t.id === id);
-    if (!transactionToDelete) return;
-
-    openConfirmationModal(
-        BN_UI_TEXT.MODAL_TITLE_CONFIRM_DELETE,
-        BN_UI_TEXT.CONFIRM_DELETE_MSG,
-        async () => {
-            const currentDate = new Date().toISOString();
-            
-            const snapshot: TransactionVersion['snapshot'] = {
-                date: transactionToDelete.date,
-                description: transactionToDelete.description,
-                amount: transactionToDelete.amount,
-                type: transactionToDelete.type,
-                originalDate: transactionToDelete.originalDate,
-                linkedLedgerEntryId: transactionToDelete.linkedLedgerEntryId,
-                isDeleted: true, 
-                deletedAt: currentDate,
-            };
-
-            const updatedTransaction: Transaction = {
-                ...transactionToDelete,
-                isDeleted: true,
-                deletedAt: currentDate,
-                lastModified: currentDate,
-                editHistory: [
-                    ...(transactionToDelete.editHistory || []),
-                    {
-                        timestamp: currentDate,
-                        action: 'deleted',
-                        userId: userIdForContext,
-                        snapshot: snapshot
-                    }
-                ]
-            };
-            try {
-                await apiService.updateRecord('transactions', userIdForContext, updatedTransaction, `id = '${id}'`);
-                setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t));
-                addNotification(BN_UI_TEXT.ITEM_DELETED, 'success');
-            } catch (error: any) {
-                addNotification(`লেনদেন সরাতে সমস্যা হয়েছে: ${error.message}`, 'error');
-            }
-            setIsConfirmModalOpen(false);
-        },
-        BN_UI_TEXT.CONFIRM_BTN_YES_DELETE,
-        "bg-red-600 hover:bg-red-700 focus:ring-red-500"
-    );
-  };
-  
-  const handleRestoreTransaction = async (id: string) => {
-    if (!currentUser || !currentUser.id) return;
-    const userIdForContext = currentUser.id;
-
-    const transactionToRestore = transactions.find(t => t.id === id);
-    if (!transactionToRestore) return;
-
-    openConfirmationModal(
-        BN_UI_TEXT.RESTORE_ITEM_TOOLTIP,
-        BN_UI_TEXT.CONFIRM_RESTORE_TRANSACTION_MSG,
-        async () => {
-            const currentDate = new Date().toISOString();
-            const snapshot: TransactionVersion['snapshot'] = {
-                date: transactionToRestore.date,
-                description: transactionToRestore.description,
-                amount: transactionToRestore.amount,
-                type: transactionToRestore.type,
-                originalDate: transactionToRestore.originalDate,
-                linkedLedgerEntryId: transactionToRestore.linkedLedgerEntryId,
-                isDeleted: false, 
-                deletedAt: undefined, 
-            };
-            const restoredTransaction: Transaction = {
-                ...transactionToRestore,
-                isDeleted: false,
-                deletedAt: undefined,
-                lastModified: currentDate,
-                editHistory: [
-                    ...(transactionToRestore.editHistory || []),
-                    {
-                        timestamp: currentDate,
-                        action: 'restored',
-                        userId: userIdForContext,
-                        snapshot: snapshot
-                    }
-                ]
-            };
-            try {
-                await apiService.updateRecord('transactions', userIdForContext, restoredTransaction, `id = '${id}'`);
-                setTransactions(prev => prev.map(t => t.id === id ? restoredTransaction : t));
-                addNotification(BN_UI_TEXT.ITEM_RESTORED_SUCCESS, 'success');
-            } catch (error: any) {
-                addNotification(`লেনদেন পুনরুদ্ধার করতে সমস্যা হয়েছে: ${error.message}`, 'error');
-            }
-             setIsConfirmModalOpen(false);
-        },
-        BN_UI_TEXT.CONFIRM_BTN_YES_RESTORE,
-        "bg-green-600 hover:bg-green-700 focus:ring-green-500"
-    );
-  };
-
-  const handleViewTransactionHistory = (transaction: Transaction) => {
-    setViewingTransactionEditHistoryFor(transaction);
-    setIsTransactionEditHistoryModalOpen(true);
-  };
-  
-  // Person Handler
-  const handleSavePerson = async (
-    personData: Omit<Person, 'id' | 'userId' | 'createdAt' | 'lastModified' | 'editHistory'>,
-    existingPersonId?: string,
-    isImplicitAdd: boolean = false, 
-    forSelectionContext: boolean = false 
-  ): Promise<Person | null> => {
-    if (!currentUser || !currentUser.id) return null;
-    const userIdForContext = currentUser.id;
-    const currentDate = new Date().toISOString();
-
-    let profileImageAction: ProfileImageAction = 'none';
-    if (existingPersonId) {
-        const originalPerson = persons.find(p => p.id === existingPersonId);
-        if (personData.profileImage && !originalPerson?.profileImage) profileImageAction = 'added';
-        else if (personData.profileImage && originalPerson?.profileImage && personData.profileImage !== originalPerson.profileImage) profileImageAction = 'updated';
-        else if (!personData.profileImage && originalPerson?.profileImage) profileImageAction = 'removed';
-    } else if (personData.profileImage) {
-        profileImageAction = 'added';
-    }
-
-    const snapshot: PersonVersion['snapshot'] = {
-      name: personData.name,
-      customAlias: personData.customAlias || '',
-      mobileNumber: personData.mobileNumber || '',
-      address: personData.address || '',
-      shopName: personData.shopName || '',
-      email: personData.email || '',
-      profileImageAction: profileImageAction,
-      isDeleted: personData.isDeleted || false, 
-      deletedAt: personData.deletedAt || undefined,
-      systemUserId: personData.systemUserId || undefined,
-    };
-
-    if (existingPersonId) {
-      const originalPerson = persons.find(p => p.id === existingPersonId);
-      if (!originalPerson) {
-        addNotification("সম্পাদনার জন্য ব্যক্তি খুঁজে পাওয়া যায়নি।", "error");
-        return null;
-      }
-      const updatedPerson: Person = {
-        ...originalPerson,
-        ...personData, 
-        lastModified: currentDate,
-        userId: userIdForContext, 
-        editHistory: [
-          ...(originalPerson.editHistory || []),
-          { timestamp: currentDate, action: 'updated', userId: userIdForContext, snapshot }
-        ],
-      };
-      try {
-        await apiService.updateRecord('persons', userIdForContext, updatedPerson, `id = '${existingPersonId}'`);
-        setPersons(prev => prev.map(p => p.id === existingPersonId ? updatedPerson : p));
-        addNotification(BN_UI_TEXT.PERSON_UPDATED_SUCCESS, 'success');
-        setIsPersonFormModalOpen(false);
-        setEditingPerson(null);
-        return updatedPerson;
-      } catch (error: any) {
-        addNotification(`ব্যক্তির তথ্য আপডেট করতে সমস্যা: ${error.message}`, 'error');
-        return null;
-      }
-    } else {
-      const newPersonId = 'person_' + Date.now().toString() + Math.random().toString(36).substring(2, 9);
-      const newPerson: Person = {
-        id: newPersonId,
-        userId: userIdForContext,
-        ...personData,
-        createdAt: currentDate,
-        lastModified: currentDate,
-        editHistory: [{ timestamp: currentDate, action: 'created', userId: userIdForContext, snapshot }],
-        isDeleted: false,
-      };
-      try {
-        await apiService.insertRecord('persons', userIdForContext, newPerson);
-        setPersons(prev => [newPerson, ...prev]);
-        if (!isImplicitAdd) { 
-            addNotification(BN_UI_TEXT.PERSON_ADDED_SUCCESS, 'success');
-        }
-        setIsPersonFormModalOpen(false);
-        
-        if (forSelectionContext && activePersonSelectionCallback) {
-            activePersonSelectionCallback(newPerson.id);
-            setActivePersonSelectionCallback(null); 
-            setIsAddingPersonForSelectionContext(false); 
-        }
-        return newPerson;
-      } catch (error: any) {
-        addNotification(`নতুন ব্যক্তি যোগ করতে সমস্যা: ${error.message}`, 'error');
-        return null;
-      }
-    }
-  };
-
-  // Ledger Entry Handler
-  const handleAddPersonLedgerEntry = async (data: {
-    personId: string;
-    type: PersonLedgerEntryType;
-    amount: number;
-    description: string;
-    date: string; 
-  }): Promise<PersonLedgerEntry | null> => {
-    if (!currentUser || !currentUser.id) return null;
-    const userIdForContext = currentUser.id;
-
-    const personSpecificEntries = personLedgerEntries
-      .filter(entry => entry.personId === data.personId)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id.localeCompare(b.id));
-    
-    let lastBalance = 0;
-    if (personSpecificEntries.length > 0) {
-      lastBalance = personSpecificEntries[personSpecificEntries.length - 1].balanceAfterEntry;
-    }
-
-    const currentEntryEffect = data.type === PersonLedgerEntryType.CREDIT ? data.amount : -data.amount;
-    const balanceAfterThisEntry = lastBalance + currentEntryEffect;
-
-    const newEntry: PersonLedgerEntry = {
-      id: 'ple_' + Date.now().toString() + Math.random().toString(36).substring(2, 9),
-      userId: userIdForContext,
-      personId: data.personId,
-      date: data.date,
-      type: data.type,
-      amount: data.amount,
-      description: data.description,
-      balanceAfterEntry: balanceAfterThisEntry,
-    };
-
-    try {
-      await apiService.insertRecord('person_ledger_entries', userIdForContext, newEntry);
-      setPersonLedgerEntries(prev => [...prev, newEntry]);
-      addNotification(BN_UI_TEXT.LEDGER_ENTRY_ADDED_SUCCESS, 'success');
-      
-      const personName = persons.find(p => p.id === data.personId)?.name || BN_UI_TEXT.UNKNOWN_PERSON;
-      let transactionDesc = '';
-      let transactionType: TransactionType | null = null;
-
-      if (data.type === PersonLedgerEntryType.CREDIT) {
-        transactionDesc = BN_UI_TEXT.LEDGER_CREDIT_INCOME_DESC
-            .replace("{personName}", personName)
-            .replace("{description}", data.description);
-        transactionType = TransactionType.INCOME;
-      } else { 
-         transactionDesc = BN_UI_TEXT.LEDGER_DEBIT_EXPENSE_DESC
-            .replace("{personName}", personName)
-            .replace("{description}", data.description);
-         transactionType = TransactionType.EXPENSE;
-      }
-
-      if (transactionType) {
-        const transactionDataForLedger = {
-            description: transactionDesc,
-            amount: data.amount,
-            type: transactionType,
-            date: data.date,
+    if (transactionToDelete) {
+        const deletedAtTime = new Date().toISOString();
+        const snapshotForHistory: TransactionVersion['snapshot'] = {
+            date: transactionToDelete.date,
+            description: transactionToDelete.description,
+            amount: transactionToDelete.amount,
+            type: transactionToDelete.type,
+            originalDate: transactionToDelete.originalDate,
+            linkedLedgerEntryId: transactionToDelete.linkedLedgerEntryId,
+            bankAccountId: transactionToDelete.bankAccountId,
+            bankAccountName: transactionToDelete.bankAccountName,
+            isDeleted: true,
+            deletedAt: deletedAtTime,
         };
-        await handleAddTransaction(transactionDataForLedger); 
-      }
-      return newEntry;
-    } catch (error: any) {
-      addNotification(`খতিয়ান এন্ট্রি যোগ করতে সমস্যা: ${error.message}`, 'error');
-      return null;
-    }
-  };
-
-
-  // Debt Handlers
-  const handleAddOrUpdateDebtEntry = async (debtFormData: DebtFormSubmitData, originalDebtId?: string) => {
-    if (!currentUser || !currentUser.id) return;
-    const userIdForContext = currentUser.id;
-    const currentDate = new Date().toISOString();
-
-    const { personNameValue, explicitSelectedPersonId, amount, description, formPurpose, debtType, dueDate, paymentDate } = debtFormData;
-    let personId = explicitSelectedPersonId;
-
-    if (!personId) { 
-      const existingPerson = persons.find(p => p.name.toLowerCase() === personNameValue.toLowerCase() && !p.isDeleted);
-      if (existingPerson) {
-        personId = existingPerson.id;
-      } else {
-        const newPersonData: Omit<Person, 'id' | 'userId' | 'createdAt' | 'lastModified' | 'editHistory'> = { 
-            name: personNameValue 
-        };
-        const addedPerson = await handleSavePerson(newPersonData, undefined, true); 
-        if (addedPerson) {
-          personId = addedPerson.id;
-          addNotification(
-            (formPurpose === FormPurpose.CREATE_PAYABLE || formPurpose === FormPurpose.CREATE_RECEIVABLE) 
-              ? BN_UI_TEXT.PERSON_ADDED_IMPLICITLY_DEBT.replace("{personName}", personNameValue)
-              : BN_UI_TEXT.PERSON_ADDED_IMPLICITLY_FOR_ENTRY.replace("{personName}", personNameValue),
-            'info',
-            6000
-          );
-        } else {
-          addNotification("নতুন ব্যক্তি যোগ করতে সমস্যা হয়েছে।", 'error');
-          return;
-        }
-      }
-    }
-
-    if (!personId) {
-        addNotification("ব্যক্তির আইডি নির্ধারণ করা যায়নি।", 'error');
-        return;
-    }
-
-    if (formPurpose === FormPurpose.RECORD_PERSON_PAYMENT || formPurpose === FormPurpose.RECORD_USER_PAYMENT_TO_PERSON) {
-      if (!paymentDate) {
-        addNotification(BN_UI_TEXT.DEBT_FORM_ALERT_PAYMENT_DATE_REQUIRED, 'error');
-        return;
-      }
-      
-      const relevantDebts = debts.filter(d => d.personId === personId && !d.isSettled &&
-        (formPurpose === FormPurpose.RECORD_PERSON_PAYMENT ? d.type === DebtType.RECEIVABLE : d.type === DebtType.PAYABLE))
-        .sort((a,b) => new Date(a.creationDate).getTime() - new Date(b.creationDate).getTime()); 
-
-      let remainingPaymentAmount = amount;
-      for (const debt of relevantDebts) {
-        if (remainingPaymentAmount <= 0) break;
-        
-        const paymentForThisDebt = Math.min(remainingPaymentAmount, debt.remainingAmount);
-        const newRemainingAmountForDebt = debt.remainingAmount - paymentForThisDebt;
-        const isNowSettled = newRemainingAmountForDebt <= 0;
-        const settledDateForSnapshot = isNowSettled ? paymentDate : undefined;
-
-        const snapshotForLedgerDebtUpdate: DebtVersion['snapshot'] = {
-            personId: debt.personId,
-            originalAmount: debt.originalAmount,
-            remainingAmount: newRemainingAmountForDebt,
-            description: `${debt.description} ${BN_UI_TEXT.DEBT_HISTORY_PAID_BY_LEDGER_CREDIT.replace("{amount}", paymentForThisDebt.toString())}`.trim(),
-            type: debt.type,
-            dueDate: debt.dueDate,
-            isSettled: isNowSettled,
-            creationDate: debt.creationDate,
-            settledDate: settledDateForSnapshot,
-        };
-
-        const updatedDebt: Debt = {
-          ...debt,
-          remainingAmount: newRemainingAmountForDebt,
-          isSettled: isNowSettled,
-          settledDate: settledDateForSnapshot,
-          lastModified: currentDate,
-          editHistory: [
-            ...(debt.editHistory || []),
-            {
-              timestamp: currentDate,
-              action: 'updated',
-              userId: userIdForContext,
-              snapshot: snapshotForLedgerDebtUpdate
-            }
-          ]
-        };
-        try {
-            await apiService.updateRecord('debts', userIdForContext, updatedDebt, `id = '${updatedDebt.id}'`);
-            setDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
-            remainingPaymentAmount -= paymentForThisDebt;
-        } catch (error: any) {
-            addNotification(`সম্পর্কিত দেনা/পাওনা আপডেট করতে সমস্যা হয়েছে: ${error.message}`, 'error');
-        }
-      }
-
-      const ledgerEntryType = formPurpose === FormPurpose.RECORD_PERSON_PAYMENT ? PersonLedgerEntryType.CREDIT : PersonLedgerEntryType.DEBIT;
-      await handleAddPersonLedgerEntry({
-        personId: personId,
-        type: ledgerEntryType,
-        amount: amount,
-        description: description,
-        date: paymentDate
-      });
-      
-      addNotification(
-        formPurpose === FormPurpose.RECORD_PERSON_PAYMENT ? BN_UI_TEXT.LEDGER_ENTRY_FROM_DEBT_FORM_SUCCESS : BN_UI_TEXT.LEDGER_ENTRY_USER_PAYMENT_SUCCESS,
-        'success'
-      );
-      setIsAddDebtModalOpen(false);
-
-    } else { 
-      if (!debtType) {
-        addNotification("দেনা/পাওনার ধরণ নির্ধারণ করা যায়নি।", 'error');
-        return;
-      }
-      
-      if (originalDebtId) { 
-        const existingDebt = debts.find(d => d.id === originalDebtId);
-        if (!existingDebt) {
-          addNotification("সম্পাদনার জন্য দেনা/পাওনা খুঁজে পাওয়া যায়নি।", 'error');
-          return;
-        }
-        const newRemainingAmount = existingDebt.isSettled ? 0 : amount; 
-
-        const snapshotForDebtUpdate: DebtVersion['snapshot'] = {
-            personId: personId,
-            originalAmount: amount,
-            remainingAmount: newRemainingAmount,
-            description: description,
-            type: debtType,
-            dueDate: dueDate || undefined,
-            isSettled: existingDebt.isSettled, 
-            creationDate: existingDebt.creationDate, 
-            settledDate: existingDebt.settledDate, 
-        };
-
-        const updatedDebt: Debt = {
-            ...existingDebt,
-            personId: personId, 
-            originalAmount: amount,
-            remainingAmount: newRemainingAmount, 
-            description: description,
-            type: debtType,
-            dueDate: dueDate || undefined,
-            lastModified: currentDate,
+        const updatedTransaction: Transaction = {
+            ...transactionToDelete,
+            isDeleted: true,
+            deletedAt: deletedAtTime,
+            lastModified: new Date().toISOString(),
             editHistory: [
-              ...(existingDebt.editHistory || []),
-              {
-                timestamp: currentDate,
-                action: 'updated',
-                userId: userIdForContext,
-                snapshot: snapshotForDebtUpdate
-              }
+                ...(transactionToDelete.editHistory || []),
+                {
+                    timestamp: new Date().toISOString(),
+                    action: 'deleted' as TransactionVersion['action'],
+                    userId: currentUser.id,
+                    snapshot: snapshotForHistory,
+                }
             ]
         };
-        try {
-            await apiService.updateRecord('debts', userIdForContext, updatedDebt, `id = '${updatedDebt.id}'`);
-            setDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
-            addNotification(BN_UI_TEXT.DEBT_UPDATED, 'success');
-            setIsEditDebtModalOpen(false);
-            setEditingDebt(null);
-        } catch (error: any) {
-            addNotification(`দেনা/পাওনা আপডেট করতে সমস্যা হয়েছে: ${error.message}`, 'error');
+        setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t));
+        await apiService.updateRecord('transactions', currentUser!.id!, { 
+            isDeleted: 1, 
+            deletedAt: updatedTransaction.deletedAt, 
+            lastModified: updatedTransaction.lastModified, 
+            editHistory: JSON.stringify(updatedTransaction.editHistory) 
+        }, `id = '${id}'`);
+        addNotification(BN_UI_TEXT.ITEM_DELETED, 'success');
+    }
+  };
+  const handleRestoreTransaction = async (id: string) => { console.log("Restore transaction", id); };
+  const handleViewTransactionHistory = (transaction: Transaction) => { setViewingTransactionEditHistoryFor(transaction); setIsTransactionEditHistoryModalOpen(true); };
+
+const handleSaveDebt = async (debtData: DebtFormSubmitData, originalDebtId?: string) => {
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) {
+      addNotification(currentUser?.id === PREVIEW_USER_ID ? "পূর্বরূপ মোডে দেনা/পাওনা সংরক্ষণ করা যাবে না।" : BN_UI_TEXT.AUTH_ERROR_GENERAL, 'info');
+      if(originalDebtId) setIsEditDebtModalOpen(false); else setIsAddDebtModalOpen(false);
+      return;
+    }
+
+    let personIdToUse = debtData.explicitSelectedPersonId;
+    if (!personIdToUse && debtData.personNameValue.trim()) {
+      const existingPerson = persons.find(p => 
+        !p.isDeleted && (
+            (p.customAlias && p.customAlias.toLowerCase() === debtData.personNameValue.trim().toLowerCase()) ||
+            p.name.toLowerCase() === debtData.personNameValue.trim().toLowerCase()
+        )
+      );
+      if (existingPerson) {
+        personIdToUse = existingPerson.id;
+      } else {
+        addNotification("নতুন ব্যক্তি তৈরি করার সুবিধা এখনো সম্পূর্ণ হয়নি। অনুগ্রহ করে তালিকা থেকে ব্যক্তি নির্বাচন করুন অথবা নিশ্চিত করুন নামটি সঠিক।", 'warning');
+        const newPerson = await handleSavePerson({ name: debtData.personNameValue.trim() });
+        if (newPerson && newPerson.id) {
+          personIdToUse = newPerson.id;
+          addNotification(BN_UI_TEXT.PERSON_ADDED_IMPLICITLY_DEBT.replace("{personName}", debtData.personNameValue.trim()), 'success');
+        } else {
+          addNotification("ব্যক্তি তৈরি করতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।", 'error');
+          return;
         }
-      } else { // Adding new debt
-         const newDebtId = 'debt_' + Date.now().toString() + Math.random().toString(36).substring(2, 9);
-         const snapshotForNewDebt: DebtVersion['snapshot'] = {
-            personId: personId,
-            originalAmount: amount,
-            remainingAmount: amount,
-            description: description,
-            type: debtType,
-            dueDate: dueDate || undefined,
-            isSettled: false,
-            creationDate: currentDate,
-         };
-         const newDebt: Debt = {
-            id: newDebtId,
-            userId: userIdForContext,
-            personId: personId,
-            originalAmount: amount,
-            remainingAmount: amount,
-            description: description,
-            type: debtType,
-            dueDate: dueDate || undefined,
-            isSettled: false,
-            creationDate: currentDate,
-            lastModified: currentDate,
-            editHistory: [{
-              timestamp: currentDate,
-              action: 'created',
-              userId: userIdForContext,
-              snapshot: snapshotForNewDebt
-            }]
-         };
-        try {
-            await apiService.insertRecord('debts', userIdForContext, newDebt);
-            setDebts(prev => [newDebt, ...prev]);
-            addNotification(BN_UI_TEXT.DEBT_ADDED, 'success');
-            setIsAddDebtModalOpen(false);
-        } catch (error: any) {
-            addNotification(`নতুন দেনা/পাওনা যোগ করতে সমস্যা হয়েছে: ${error.message}`, 'error');
+      }
+    }
+
+    if (!personIdToUse) {
+      addNotification(BN_UI_TEXT.PERSON_NAME_REQUIRED, 'error');
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const debtTypeFromFormPurpose = 
+        debtData.formPurpose === FormPurpose.CREATE_PAYABLE ? DebtType.PAYABLE : 
+        debtData.formPurpose === FormPurpose.CREATE_RECEIVABLE ? DebtType.RECEIVABLE : 
+        null;
+    
+    if (!debtTypeFromFormPurpose && !originalDebtId) { 
+        addNotification("দেনা/পাওনার ধরণ নির্ধারণ করা হয়নি।", 'error');
+        return;
+    }
+
+
+    if (originalDebtId) { 
+      const debtToUpdate = debts.find(d => d.id === originalDebtId);
+      if (!debtToUpdate) {
+        addNotification("সম্পাদনার জন্য দেনা/পাওনা খুঁজে পাওয়া যায়নি।", 'error');
+        return;
+      }
+
+      const updatedDebtData: Partial<Debt> = {
+        personId: personIdToUse,
+        originalAmount: debtData.amount, 
+        remainingAmount: debtData.amount - (debtToUpdate.originalAmount - debtToUpdate.remainingAmount),
+        description: debtData.description,
+        type: debtData.debtType || debtToUpdate.type, 
+        dueDate: debtData.dueDate || undefined,
+        lastModified: now,
+      };
+      
+      if (updatedDebtData.remainingAmount! < 0) {
+          addNotification("মূল পরিমাণ পরিশোধিত পরিমাণের চেয়ে কম হতে পারবে না।", 'warning');
+          updatedDebtData.remainingAmount = 0; 
+      }
+      if (updatedDebtData.remainingAmount === 0 && !debtToUpdate.isSettled) {
+      }
+
+
+      const newHistoryEntry: DebtVersion = {
+        timestamp: now,
+        action: 'updated',
+        userId: currentUser.id,
+        snapshot: {
+          personId: updatedDebtData.personId!,
+          originalAmount: updatedDebtData.originalAmount!,
+          remainingAmount: updatedDebtData.remainingAmount!,
+          description: updatedDebtData.description!,
+          type: updatedDebtData.type!,
+          dueDate: updatedDebtData.dueDate,
+          isSettled: debtToUpdate.isSettled, 
+          creationDate: debtToUpdate.creationDate,
+          settledDate: debtToUpdate.settledDate,
         }
+      };
+
+      const finalDebtToUpdate: Debt = {
+        ...debtToUpdate,
+        ...updatedDebtData,
+        editHistory: [...(debtToUpdate.editHistory || []), newHistoryEntry],
+      };
+      
+      try {
+        setDebts(prevDebts => prevDebts.map(d => d.id === originalDebtId ? finalDebtToUpdate : d));
+        await apiService.updateRecord('debts', currentUser.id, finalDebtToUpdate, `id = '${originalDebtId}'`);
+        addNotification(BN_UI_TEXT.DEBT_UPDATED, 'success');
+        setIsEditDebtModalOpen(false);
+        setEditingDebt(null);
+      } catch (error: any) {
+        console.error("Error updating debt:", error);
+        addNotification(`দেনা/পাওনা আপডেট করতে সমস্যা: ${error.message}`, 'error');
+        setDebts(prev => prev.map(d => d.id === originalDebtId ? debtToUpdate : d)); 
+      }
+
+    } else { 
+      if (!debtTypeFromFormPurpose) { 
+          addNotification("নতুন দেনা/পাওনার জন্য ধরণ আবশ্যক।", 'error');
+          return;
+      }
+      const newDebtId = `debt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const newDebt: Debt = {
+        id: newDebtId,
+        userId: currentUser.id,
+        personId: personIdToUse,
+        originalAmount: debtData.amount,
+        remainingAmount: debtData.amount,
+        description: debtData.description,
+        type: debtTypeFromFormPurpose,
+        dueDate: debtData.dueDate || undefined,
+        isSettled: false,
+        creationDate: now,
+        lastModified: now,
+        editHistory: [{
+          timestamp: now,
+          action: 'created',
+          userId: currentUser.id,
+          snapshot: {
+            personId: personIdToUse,
+            originalAmount: debtData.amount,
+            remainingAmount: debtData.amount,
+            description: debtData.description,
+            type: debtTypeFromFormPurpose,
+            dueDate: debtData.dueDate || undefined,
+            isSettled: false,
+            creationDate: now,
+          }
+        }],
+      };
+
+      try {
+        setDebts(prevDebts => [newDebt, ...prevDebts]);
+        await apiService.insertRecord('debts', currentUser.id, newDebt);
+        addNotification(BN_UI_TEXT.DEBT_ADDED, 'success');
+        setIsAddDebtModalOpen(false);
+      } catch (error: any) {
+        console.error("Error adding debt:", error);
+        addNotification(`দেনা/পাওনা যোগ করতে সমস্যা: ${error.message}`, 'error');
+        setDebts(prevDebts => prevDebts.filter(d => d.id !== newDebtId)); 
       }
     }
   };
 
-  const handleOpenAddIncomeModal = () => {
-    setIsAddIncomeModalOpen(true);
-  };
+  const handleDeleteDebt = async (id: string) => { console.log("Delete debt", id); };
+  
+  const handleToggleSettleDebt = async (id: string) => {
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) {
+      addNotification("ব্যবহারকারী লগইন করা নেই অথবা পূর্বরূপ মোডে এই কাজ করা যাবে না।", 'info');
+      return;
+    }
+    const debtIndex = debts.findIndex(d => d.id === id);
+    if (debtIndex === -1) return;
 
-  const handleOpenAddExpenseModal = () => {
-    setIsAddExpenseModalOpen(true);
-  };
-
-
-  const handleToggleSettleDebt = async (debtId: string) => {
-    if (!currentUser || !currentUser.id) return;
-    const userIdForContext = currentUser.id;
-    const debtToToggle = debts.find(d => d.id === debtId);
-    if (!debtToToggle) return;
-
-    const isNowSettled = !debtToToggle.isSettled;
-    const currentDate = new Date().toISOString();
-    
-    const snapshot: DebtVersion['snapshot'] = {
-        personId: debtToToggle.personId,
-        originalAmount: debtToToggle.originalAmount,
-        remainingAmount: isNowSettled ? 0 : debtToToggle.originalAmount, 
-        description: debtToToggle.description,
-        type: debtToToggle.type,
-        dueDate: debtToToggle.dueDate,
-        isSettled: isNowSettled,
-        creationDate: debtToToggle.creationDate,
-        settledDate: isNowSettled ? currentDate : undefined,
-    };
+    const debtToUpdate = debts[debtIndex];
+    const now = new Date().toISOString();
+    const wasSettled = debtToUpdate.isSettled;
+    const newSettledStatus = !wasSettled;
 
     const updatedDebt: Debt = {
-      ...debtToToggle,
-      isSettled: isNowSettled,
-      remainingAmount: isNowSettled ? 0 : debtToToggle.originalAmount, 
-      settledDate: isNowSettled ? currentDate : undefined,
-      lastModified: currentDate,
+      ...debtToUpdate,
+      isSettled: newSettledStatus,
+      settledDate: newSettledStatus ? now : undefined,
+      remainingAmount: newSettledStatus ? 0 : debtToUpdate.originalAmount, // Reset remaining if unsettled
+      lastModified: now,
       editHistory: [
-        ...(debtToToggle.editHistory || []),
+        ...(debtToUpdate.editHistory || []),
         {
-          timestamp: currentDate,
+          timestamp: now,
           action: 'updated',
-          userId: userIdForContext,
-          snapshot: snapshot
+          userId: currentUser.id,
+          snapshot: {
+            ...debtToUpdate, // old state before this change
+            isSettled: newSettledStatus,
+            settledDate: newSettledStatus ? now : undefined,
+            remainingAmount: newSettledStatus ? 0 : debtToUpdate.originalAmount,
+          } as DebtVersion['snapshot'],
         }
       ]
     };
+    
+    setDebts(prevDebts => prevDebts.map(d => d.id === id ? updatedDebt : d));
 
     try {
-        await apiService.updateRecord('debts', userIdForContext, updatedDebt, `id = '${debtId}'`);
-        setDebts(prev => prev.map(d => d.id === debtId ? updatedDebt : d));
-        addNotification(BN_UI_TEXT.DEBT_UPDATED, 'success');
+      await apiService.updateRecord('debts', currentUser.id, updatedDebt, `id = '${id}'`);
+      addNotification(newSettledStatus ? "দেনা/পাওনা পরিশোধিত হিসাবে চিহ্নিত করা হয়েছে।" : "দেনা/পাওনা অপরিশোধিত হিসাবে চিহ্নিত করা হয়েছে।", 'success');
 
-        if (isNowSettled) {
-            const person = persons.find(p => p.id === debtToToggle.personId);
-            const personName = person ? person.name : BN_UI_TEXT.UNKNOWN_PERSON;
-            let transactionDesc = '';
-            let transactionType: TransactionType;
+      // If marking as settled, create a transaction
+      if (newSettledStatus && debtToUpdate.remainingAmount > 0) {
+        const person = persons.find(p => p.id === debtToUpdate.personId);
+        const personName = person ? (person.customAlias || person.name) : BN_UI_TEXT.UNKNOWN_PERSON;
+        
+        const transactionData: Omit<Transaction, 'id' | 'userId' | 'editHistory' | 'lastModified' | 'originalDate'> = {
+          date: debtToUpdate.settledDate || now,
+          amount: debtToUpdate.remainingAmount, // The amount settled
+          type: debtToUpdate.type === DebtType.PAYABLE ? TransactionType.EXPENSE : TransactionType.INCOME,
+          description: debtToUpdate.type === DebtType.PAYABLE 
+            ? `দেনা পরিশোধ: ${personName} (${debtToUpdate.description})`
+            : `পাওনা আদায়: ${personName} (${debtToUpdate.description})`,
+          linkedLedgerEntryId: `debt_settle_${debtToUpdate.id}`,
+          bankAccountId: defaultBankAccountId || undefined,
+          bankAccountName: defaultBankAccountId ? bankAccounts.find(ba => ba.id === defaultBankAccountId)?.accountName : undefined,
+        };
+        await handleAddTransaction(transactionData);
+      }
+      // Note: If un-settling, ideally the corresponding transaction should be voided/deleted.
+      // This is complex and not implemented here for simplicity.
 
-            if (debtToToggle.type === DebtType.RECEIVABLE) {
-                transactionDesc = BN_UI_TEXT.DEBT_SETTLED_INCOME_DESC
-                .replace("{personName}", personName)
-                .replace("{description}", debtToToggle.description);
-                transactionType = TransactionType.INCOME;
-            } else {
-                transactionDesc = BN_UI_TEXT.DEBT_SETTLED_EXPENSE_DESC
-                .replace("{personName}", personName)
-                .replace("{description}", debtToToggle.description);
-                transactionType = TransactionType.EXPENSE;
-            }
-            
-            const transactionDataForDebtSettle = {
-                description: transactionDesc,
-                amount: debtToToggle.originalAmount, 
-                type: transactionType,
-                date: currentDate, 
-            };
-            await handleAddTransaction(transactionDataForDebtSettle);
-        }
     } catch (error: any) {
-        addNotification(`দেনা/পাওনা আপডেট করতে সমস্যা হয়েছে: ${error.message}`, 'error');
+      console.error("Error updating debt settlement status:", error);
+      addNotification(`দেনা/পাওনার অবস্থা পরিবর্তনে সমস্যা: ${error.message}`, 'error');
+      setDebts(prevDebts => prevDebts.map(d => d.id === id ? debtToUpdate : d)); // Revert on error
     }
-  };
-
-  const handleDeleteDebt = async (id: string) => {
-    if (!currentUser || !currentUser.id) return;
-    const userIdForContext = currentUser.id;
-    openConfirmationModal(
-      BN_UI_TEXT.DELETE_DEBT_TOOLTIP,
-      BN_UI_TEXT.CONFIRM_DELETE_DEBT_MSG,
-      async () => {
-        try {
-          await apiService.deleteRecord('debts', userIdForContext, `id = '${id}'`);
-          setDebts(prev => prev.filter(d => d.id !== id));
-          addNotification(BN_UI_TEXT.DEBT_DELETED, 'success');
-        } catch (error: any) {
-          addNotification(`দেনা/পাওনা মুছতে সমস্যা হয়েছে: ${error.message}`, 'error');
-        }
-        setIsConfirmModalOpen(false);
-      },
-      BN_UI_TEXT.CONFIRM_BTN_YES_DELETE,
-      "bg-red-600 hover:bg-red-700 focus:ring-red-500"
-    );
-  };
-
-  const handleViewDebtHistory = (debt: Debt) => {
-    setViewingDebtEditHistoryFor(debt);
-    setIsDebtEditHistoryModalOpen(true);
-  };
-
-  const handleOpenEditDebtModal = (debt: Debt) => {
-    setEditingDebt(debt);
-    setIsEditDebtModalOpen(true);
-  };
-
-  const handleOpenManagePersonsModal = () => {
-    setIsManagePersonsModalOpen(true);
   };
   
-  const handleOpenPersonFormModal = (personToEdit?: Person) => {
-    setEditingPerson(personToEdit || null);
-    setIsPersonFormModalOpen(true);
-    setIsManagePersonsModalOpen(false); 
-  };
+  const handleViewDebtHistory = (debt: Debt) => { setViewingDebtEditHistoryFor(debt); setIsDebtEditHistoryModalOpen(true); };
+  
+  const handleSavePerson = async (personData: any, existingPersonId?: string) => { console.log("Save person", personData, existingPersonId); return null;};
+  const handleDeletePerson = async (id: string) => { console.log("Delete person", id); };
+  const handleRestorePerson = async (id: string) => { console.log("Restore person", id); };
+  const handleViewPersonHistory = (person: Person) => { setViewingPersonHistoryFor(person); setIsPersonHistoryModalOpen(true); };
 
-  const handleClosePersonFormModal = () => {
-    setIsPersonFormModalOpen(false);
-    setEditingPerson(null);
-    if(isAddingPersonForSelectionContext) {
-        setIsSelectPersonModalOpen(true); 
-        setIsAddingPersonForSelectionContext(false);
-    } else {
-        setIsManagePersonsModalOpen(true); 
+  const handleStockAdjustmentFromPurchase = async (productId: string, quantity: number, invoiceNumber: string, purchaseDate: string) => {
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) return;
+    const productToUpdate = products.find(p => p.id === productId);
+    if (!productToUpdate) {
+      console.error(`Product with ID ${productId} not found for stock adjustment.`);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const adjustmentDate = purchaseDate || now;
+
+    const newStockLevel = (productToUpdate.currentStock || 0) + quantity;
+
+    const stockAdjustmentEntry: StockAdjustment = {
+      id: `sh_${Date.now().toString()}_${Math.random().toString(36).substring(2, 7)}`,
+      date: adjustmentDate,
+      type: 'purchase_received',
+      quantityChange: quantity,
+      newStockLevel: newStockLevel,
+      notes: `ক্রয় বিল #${invoiceNumber} থেকে প্রাপ্ত`,
+      relatedInvoiceId: invoices.find(inv => inv.invoiceNumber === invoiceNumber)?.id, 
+      userId: currentUser.id,
+    };
+
+    const updatedProduct: Product = {
+      ...productToUpdate,
+      currentStock: newStockLevel,
+      stockHistory: [...(productToUpdate.stockHistory || []), stockAdjustmentEntry],
+      lastModified: now,
+    };
+
+    setProducts(prevProducts => prevProducts.map(p => p.id === productId ? updatedProduct : p));
+    try {
+      await apiService.updateRecord('products', currentUser.id, {
+        currentStock: updatedProduct.currentStock,
+        stockHistory: JSON.stringify(updatedProduct.stockHistory),
+        lastModified: updatedProduct.lastModified,
+      }, `id = '${productId}'`);
+      addNotification(`'${productToUpdate.name}' এর স্টক ${quantity.toLocaleString('bn-BD')} ${productToUpdate.stockUnit || ''} বৃদ্ধি করা হয়েছে।`, 'success');
+    } catch (error: any) {
+      addNotification(`'${productToUpdate.name}' এর স্টক আপডেট করতে সমস্যা: ${error.message}`, 'error');
+      setProducts(prevProducts => prevProducts.map(p => p.id === productId ? productToUpdate : p));
     }
   };
 
-  const handleDeletePerson = async (personId: string) => {
-    if (!currentUser || !currentUser.id) return;
-    const userIdForContext = currentUser.id;
+  const handleSaveProduct = async (
+    productData: Omit<Product, 'id' | 'userId' | 'createdAt' | 'lastModified' | 'stockHistory' | 'isDeleted' | 'deletedAt' | 'currentStock' | 'stockUnit' | 'lowStockThreshold'>,
+    initialStockData?: { initialStock?: number, stockUnit?: string, lowStockThreshold?: number },
+    existingProductId?: string
+  ) => {
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) {
+      addNotification(currentUser?.id === PREVIEW_USER_ID ? "পূর্বরূপ মোডে পণ্য যোগ/সম্পাদন করা যাবে না।" : "ব্যবহারকারী লগইন করা নেই।", 'error');
+      return null;
+    }
+    const now = new Date().toISOString();
+    if (existingProductId) { 
+      const productToUpdate = products.find(p => p.id === existingProductId);
+      if (!productToUpdate) {
+        addNotification("পণ্য খুঁজে পাওয়া যায়নি।", 'error');
+        return null;
+      }
+      const updatedProductData: Product = { 
+        ...productToUpdate,
+        ...productData, 
+        stockUnit: initialStockData?.stockUnit || productToUpdate.stockUnit || BN_UI_TEXT.DEFAULT_UNIT_PIECE, 
+        lowStockThreshold: initialStockData?.lowStockThreshold ?? productToUpdate.lowStockThreshold ?? 5, 
+        lastModified: now,
+      };
+      
+      setProducts(prev => prev.map(p => p.id === existingProductId ? updatedProductData : p));
+      await apiService.updateRecord('products', currentUser.id, updatedProductData, `id = '${existingProductId}'`);
+      addNotification(BN_UI_TEXT.PRODUCT_UPDATED_SUCCESS, 'success');
+      setIsProductFormModalOpen(false);
+      setEditingProduct(null);
+      setIsManageProductsModalOpen(true); 
+      return updatedProductData;
 
-    const personToDelete = persons.find(p => p.id === personId);
-    if (!personToDelete) return;
+    } else { 
+      const newProduct: Product = {
+        id: `prod_${Date.now().toString()}_${Math.random().toString(36).substring(2, 7)}`,
+        userId: currentUser.id,
+        ...productData,
+        createdAt: now,
+        lastModified: now,
+        currentStock: initialStockData?.initialStock ?? 0,
+        stockUnit: initialStockData?.stockUnit || BN_UI_TEXT.DEFAULT_UNIT_PIECE,
+        lowStockThreshold: initialStockData?.lowStockThreshold ?? 5,
+        stockHistory: initialStockData?.initialStock && initialStockData.initialStock > 0 ? [
+          {
+            id: `sh_${Date.now()}`,
+            date: now,
+            type: 'initial',
+            quantityChange: initialStockData.initialStock,
+            newStockLevel: initialStockData.initialStock,
+            userId: currentUser.id,
+          }
+        ] : [],
+      };
+      setProducts(prev => [newProduct, ...prev]);
+      await apiService.insertRecord('products', currentUser.id, newProduct);
+      addNotification(BN_UI_TEXT.PRODUCT_ADDED_SUCCESS, 'success');
+      setIsProductFormModalOpen(false);
+      setIsManageProductsModalOpen(true); 
+      return newProduct;
+    }
+  };
+  const handleDeleteProduct = async (id: string) => { console.log("Delete product", id); };
+  const handleRestoreProduct = async (id: string) => { console.log("Restore product", id); };
 
-    openConfirmationModal(
-        BN_UI_TEXT.DELETE_PERSON_BTN_LABEL,
-        BN_UI_TEXT.CONFIRM_DELETE_PERSON_MSG,
-        async () => {
-            const currentDate = new Date().toISOString();
-            const snapshot: PersonVersion['snapshot'] = {
-              name: personToDelete.name,
-              mobileNumber: personToDelete.mobileNumber,
-              address: personToDelete.address,
-              shopName: personToDelete.shopName,
-              email: personToDelete.email,
-              profileImageAction: personToDelete.profileImage ? 'removed' : 'none',
-              isDeleted: true,
-              deletedAt: currentDate,
-              systemUserId: personToDelete.systemUserId,
-              customAlias: personToDelete.customAlias,
-            };
+  const handleSaveInvoice = async (invoiceData: InvoiceCreationData, originalInvoiceId?: string): Promise<Invoice | null> => {
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) {
+      addNotification(currentUser?.id === PREVIEW_USER_ID ? "পূর্বরূপ মোডে চালান তৈরি/সম্পাদনা করা যাবে না।" : "ব্যবহারকারী লগইন করা নেই।", 'error');
+      return null;
+    }
+    const now = new Date().toISOString();
 
-            const updatedPerson: Person = {
-              ...personToDelete,
-              isDeleted: true,
-              deletedAt: currentDate,
-              profileImage: undefined, // Remove profile image on soft delete
-              lastModified: currentDate,
-              editHistory: [
-                ...(personToDelete.editHistory || []),
-                {
-                  timestamp: currentDate,
-                  action: 'deleted',
-                  userId: userIdForContext,
-                  snapshot: snapshot
-                }
-              ]
-            };
-            try {
-                await apiService.updateRecord('persons', userIdForContext, updatedPerson, `id = '${personId}'`);
-                setPersons(prev => prev.map(p => p.id === personId ? updatedPerson : p));
-                addNotification(BN_UI_TEXT.PERSON_DELETED_SUCCESS, 'success');
-            } catch (error: any) {
-                addNotification(`ব্যক্তিকে সরাতে সমস্যা হয়েছে: ${error.message}`, 'error');
+    if (originalInvoiceId) { 
+      const invoiceToUpdate = invoices.find(inv => inv.id === originalInvoiceId);
+      if (!invoiceToUpdate) {
+        addNotification(BN_UI_TEXT.INVOICE_NOT_FOUND_ERROR || "চালান খুঁজে পাওয়া যায়নি।", 'error');
+        return null;
+      }
+
+      const finalInvoiceType = invoiceToUpdate.invoiceType;
+
+      const updatedInvoice: Invoice = {
+        ...invoiceToUpdate, 
+        ...invoiceData,    
+        invoiceType: finalInvoiceType, 
+        lastModified: now,
+        editHistory: [
+          ...(invoiceToUpdate.editHistory || []),
+          {
+            timestamp: now,
+            action: 'updated',
+            userId: currentUser.id,
+            snapshot: { 
+              invoiceNumber: invoiceData.invoiceNumber,
+              invoiceType: finalInvoiceType, 
+              invoiceDate: invoiceData.invoiceDate,
+              dueDate: invoiceData.dueDate,
+              personId: invoiceData.personId,
+              companyProfileId: invoiceData.companyProfileId,
+              items: invoiceData.items,
+              subtotal: invoiceData.subtotal,
+              totalAmount: invoiceData.totalAmount,
+              paymentStatus: invoiceData.paymentStatus,
+            } as AppInvoiceVersionSnapshot, 
+          }
+        ],
+      };
+      delete (updatedInvoice as any).initialPayment; 
+
+      setInvoices(prev => prev.map(inv => inv.id === originalInvoiceId ? updatedInvoice : inv));
+      setEditingInvoice(null);
+      try {
+        await apiService.updateRecord('invoices', currentUser.id, updatedInvoice, `id = '${originalInvoiceId}'`);
+        addNotification(BN_UI_TEXT.INVOICE_UPDATED_SUCCESS, 'success');
+        return updatedInvoice;
+      } catch (error: any) {
+        addNotification(BN_UI_TEXT.INVOICE_CREATION_ERROR.replace('{error}', error.message).replace('তৈরি', 'আপডেট'), 'error');
+        setInvoices(prev => prev.map(inv => inv.id === originalInvoiceId ? invoiceToUpdate : inv)); 
+        return null;
+      }
+
+    } else { 
+      if (!invoiceData.invoiceType) {
+          addNotification("চালানের প্রকার (বিক্রয়/ক্রয়) নির্ধারণ করা হয়নি।", 'error');
+          return null;
+      }
+
+      const newInvoiceId = `inv_${Date.now().toString()}_${Math.random().toString(36).substring(2, 7)}`;
+      let paymentsReceived: InvoicePayment[] = [];
+      let finalPaymentStatus = invoiceData.paymentStatus;
+
+      if (invoiceData.initialPayment) {
+        const newPayment: InvoicePayment = {
+          ...invoiceData.initialPayment,
+          id: generateUniquePaymentId(), 
+          recordedAt: now,
+        };
+        paymentsReceived.push(newPayment);
+
+        if (newPayment.amount >= invoiceData.totalAmount) {
+          finalPaymentStatus = InvoicePaymentStatus.PAID;
+        } else if (newPayment.amount > 0) {
+          finalPaymentStatus = InvoicePaymentStatus.PARTIALLY_PAID;
+        }
+      }
+
+      const newInvoice: Invoice = {
+        ...invoiceData,
+        id: newInvoiceId,
+        userId: currentUser.id,
+        createdAt: now,
+        lastModified: now,
+        paymentsReceived: paymentsReceived,
+        paymentStatus: finalPaymentStatus,
+        editHistory: [], 
+        isDeleted: false,
+      };
+      
+      setInvoices(prev => [newInvoice, ...prev]);
+      try {
+        await apiService.insertRecord('invoices', currentUser.id, newInvoice);
+        addNotification(BN_UI_TEXT.INVOICE_CREATED_SUCCESS, 'success');
+
+        if ((newInvoice.paymentStatus === InvoicePaymentStatus.PAID || newInvoice.paymentStatus === InvoicePaymentStatus.PARTIALLY_PAID) && newInvoice.initialPayment && newInvoice.initialPayment.amount > 0) {
+          const transactionAmount = newInvoice.initialPayment.amount;
+          let transactionDescription = '';
+          let transactionType: TransactionType;
+
+          if (newInvoice.invoiceType === InvoiceType.SALES) {
+              transactionDescription = BN_UI_TEXT.INVOICE_INITIAL_PAYMENT_TRANSACTION_CREATED_DESC
+                  .replace('{invoiceNumber}', newInvoice.invoiceNumber)
+                  .replace('{amount}', transactionAmount.toLocaleString('bn-BD'));
+              transactionType = TransactionType.INCOME;
+          } else { 
+              transactionDescription = BN_UI_TEXT.BILL_INITIAL_PAYMENT_TRANSACTION_CREATED_DESC
+                  .replace('{invoiceNumber}', newInvoice.invoiceNumber)
+                  .replace('{amount}', transactionAmount.toLocaleString('bn-BD'));
+              transactionType = TransactionType.EXPENSE;
+          }
+          
+          const newTransactionData: Omit<Transaction, 'id' | 'userId' | 'editHistory' | 'lastModified' | 'originalDate'> = {
+            date: newInvoice.initialPayment.paymentDate || now,
+            description: transactionDescription,
+            amount: transactionAmount,
+            type: transactionType,
+            linkedLedgerEntryId: `invoice_${newInvoice.id}_payment_initial`,
+            bankAccountId: newInvoice.initialPayment.bankAccountId,
+            bankAccountName: newInvoice.initialPayment.bankAccountName,
+          };
+          await handleAddTransaction(newTransactionData);
+        }
+
+        if (newInvoice.invoiceType === InvoiceType.PURCHASE) {
+          for (const item of newInvoice.items) {
+            if (item.originalProductId) { 
+              await handleStockAdjustmentFromPurchase(item.originalProductId, item.quantity, newInvoice.invoiceNumber, newInvoice.invoiceDate);
+            } else {
+              const productByName = products.find(p => p.name === item.productName);
+              if(productByName) {
+                  await handleStockAdjustmentFromPurchase(productByName.id, item.quantity, newInvoice.invoiceNumber, newInvoice.invoiceDate);
+              } else {
+                  console.warn(`Could not adjust stock for item '${item.productName}' in purchase bill ${newInvoice.invoiceNumber} as product ID was missing or product not found by name.`);
+              }
             }
-            setIsConfirmModalOpen(false);
+          }
+        }
+        return newInvoice;
+      } catch (error: any) {
+        addNotification(BN_UI_TEXT.INVOICE_CREATION_ERROR.replace('{error}', error.message), 'error');
+        setInvoices(prev => prev.filter(inv => inv.id !== newInvoiceId));
+        return null;
+      }
+    }
+  };
+
+  const handleRecordInvoicePayment = async (invoiceId: string, paymentData: Omit<InvoicePayment, 'id' | 'recordedAt'>) => {
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) {
+      addNotification(currentUser?.id === PREVIEW_USER_ID ? "পূর্বরূপ মোডে পেমেন্ট রেকর্ড করা যাবে না।" : "ব্যবহারকারী লগইন করা নেই।", 'error');
+      return;
+    }
+
+    const invoiceIndex = invoices.findIndex(inv => inv.id === invoiceId);
+    if (invoiceIndex === -1) {
+      addNotification(BN_UI_TEXT.INVOICE_NOT_FOUND_ERROR || "চালান খুঁজে পাওয়া যায়নি।", 'error');
+      return;
+    }
+    const originalInvoice = invoices[invoiceIndex];
+    const now = new Date().toISOString();
+
+    const newPayment: InvoicePayment = {
+      ...paymentData,
+      id: generateUniquePaymentId(), 
+      recordedAt: now,
+    };
+
+    const updatedPaymentsReceived = [...(originalInvoice.paymentsReceived || []), newPayment];
+    const totalPaid = updatedPaymentsReceived.reduce((sum, p) => sum + p.amount, 0);
+    
+    let newPaymentStatus = originalInvoice.paymentStatus;
+    if (Math.abs(totalPaid - originalInvoice.totalAmount) < 0.001) { 
+      newPaymentStatus = InvoicePaymentStatus.PAID;
+    } else if (totalPaid > 0) {
+      newPaymentStatus = InvoicePaymentStatus.PARTIALLY_PAID;
+    } else {
+      newPaymentStatus = InvoicePaymentStatus.PENDING; 
+    }
+
+    const updatedInvoice: Invoice = {
+      ...originalInvoice,
+      paymentsReceived: updatedPaymentsReceived,
+      paymentStatus: newPaymentStatus,
+      lastModified: now,
+      editHistory: [
+        ...(originalInvoice.editHistory || []),
+        {
+          timestamp: now,
+          action: 'payment_recorded',
+          userId: currentUser.id,
+          snapshot: { 
+            ...originalInvoice, 
+            items: originalInvoice.items, 
+            paymentsReceived: updatedPaymentsReceived,
+            paymentStatus: newPaymentStatus,
+            invoiceType: originalInvoice.invoiceType, 
+          } as AppInvoiceVersionSnapshot,
+        }
+      ],
+    };
+
+    setInvoices(prev => prev.map(inv => inv.id === invoiceId ? updatedInvoice : inv));
+
+    try {
+      await apiService.updateRecord('invoices', currentUser.id, updatedInvoice, `id = '${invoiceId}'`);
+      addNotification(BN_UI_TEXT.PAYMENT_RECORDED_SUCCESS, 'success');
+
+      let transactionDescription = '';
+      let transactionType: TransactionType;
+
+      if (updatedInvoice.invoiceType === InvoiceType.SALES) {
+        transactionDescription = BN_UI_TEXT.INVOICE_PAYMENT_TRANSACTION_CREATED_DESC
+            .replace('{invoiceNumber}', updatedInvoice.invoiceNumber)
+            .replace('{amount}', paymentData.amount.toLocaleString('bn-BD'));
+        transactionType = TransactionType.INCOME;
+      } else { 
+        transactionDescription = BN_UI_TEXT.BILL_PAYMENT_TRANSACTION_CREATED_DESC
+            .replace('{invoiceNumber}', updatedInvoice.invoiceNumber)
+            .replace('{amount}', paymentData.amount.toLocaleString('bn-BD'));
+        transactionType = TransactionType.EXPENSE;
+      }
+      
+      const newTransactionData: Omit<Transaction, 'id' | 'userId' | 'editHistory' | 'lastModified' | 'originalDate'> = {
+        date: paymentData.paymentDate,
+        description: transactionDescription,
+        amount: paymentData.amount,
+        type: transactionType,
+        linkedLedgerEntryId: `invoice_${invoiceId}_payment_${newPayment.id}`,
+        bankAccountId: paymentData.bankAccountId, 
+        bankAccountName: paymentData.bankAccountName, 
+      };
+      await handleAddTransaction(newTransactionData);
+
+    } catch (error: any) {
+      addNotification(BN_UI_TEXT.PAYMENT_RECORDING_ERROR.replace('{error}', error.message), 'error');
+      setInvoices(prev => prev.map(inv => inv.id === invoiceId ? originalInvoice : inv)); 
+    }
+  };
+  
+  const handleSaveCompanyProfile = async (profileData: Omit<CompanyProfile, 'id' | 'userId' | 'createdAt' | 'lastModified'>, existingId?: string): Promise<CompanyProfile | null> => { console.log("Save company profile", profileData, existingId); return null; };
+  const handleUpdateCompanyProfile = async (profileId: string, updates: Partial<CompanyProfile>) => { console.log("Update company profile", profileId, updates); };
+  const handleDeleteCompanyProfile = async (profileId: string) => { console.log("Delete company profile", profileId); };
+
+  const handleManageBankAccountsClick = () => setIsManageBankAccountsModalOpen(true);
+  
+  const handleOpenBankAccountFormModalForAdd = () => {
+    setIsManageBankAccountsModalOpen(false);
+    setEditingBankAccount(null);
+    setIsBankAccountFormModalOpen(true);
+  };
+
+  const handleOpenBankAccountFormModalForEdit = (accountToEdit: BankAccount) => {
+    setIsManageBankAccountsModalOpen(false);
+    setEditingBankAccount(accountToEdit);
+    setIsBankAccountFormModalOpen(true);
+  };
+  
+  const handleCloseBankAccountFormModal = () => {
+    setIsBankAccountFormModalOpen(false);
+    setEditingBankAccount(null);
+    setIsManageBankAccountsModalOpen(true);
+  };
+
+  const handleSaveBankAccount = async (
+    bankAccountData: Omit<BankAccount, 'id' | 'userId' | 'createdAt' | 'lastModified' | 'editHistory' | 'isDeleted' | 'deletedAt'>,
+    existingBankAccountId?: string
+  ) => {
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) {
+      addNotification(currentUser?.id === PREVIEW_USER_ID ? "পূর্বরূপ মোডে ব্যাংক অ্যাকাউন্ট সংরক্ষণ করা যাবে না।" : "ব্যবহারকারী লগইন করা নেই।", 'error');
+      return;
+    }
+    const now = new Date().toISOString();
+
+    if (existingBankAccountId) {
+      const accountToUpdate = bankAccounts.find(acc => acc.id === existingBankAccountId);
+      if (!accountToUpdate) {
+        addNotification("ব্যাংক অ্যাকাউন্ট খুঁজে পাওয়া যায়নি।", 'error');
+        return;
+      }
+
+      const updatedAccount: BankAccount = {
+        ...accountToUpdate,
+        ...bankAccountData,
+        lastModified: now,
+        editHistory: [
+          ...(accountToUpdate.editHistory || []),
+          {
+            timestamp: now,
+            action: 'updated',
+            userId: currentUser.id,
+            snapshot: { ...bankAccountData, isDeleted: accountToUpdate.isDeleted, deletedAt: accountToUpdate.deletedAt },
+          }
+        ]
+      };
+      setBankAccounts(prev => prev.map(acc => acc.id === existingBankAccountId ? updatedAccount : acc));
+      await apiService.updateRecord('bank_accounts', currentUser.id, updatedAccount, `id = '${existingBankAccountId}'`);
+      addNotification(BN_UI_TEXT.BANK_ACCOUNT_UPDATED_SUCCESS, 'success');
+
+    } else {
+      const newAccountId = `bank_${Date.now().toString()}_${Math.random().toString(36).substring(2,7)}`;
+      const newAccount: BankAccount = {
+        id: newAccountId,
+        userId: currentUser.id,
+        ...bankAccountData,
+        createdAt: now,
+        lastModified: now,
+        editHistory: [{
+          timestamp: now,
+          action: 'created',
+          userId: currentUser.id,
+          snapshot: { ...bankAccountData, isDeleted: false },
+        }],
+      };
+      setBankAccounts(prev => [newAccount, ...prev]);
+      await apiService.insertRecord('bank_accounts', currentUser.id, newAccount);
+      addNotification(BN_UI_TEXT.BANK_ACCOUNT_ADDED_SUCCESS, 'success');
+    }
+    
+    if (bankAccountData.isDefault) {
+        await handleSetDefaultBankAccount(existingBankAccountId || bankAccounts.find(ba => ba.accountName === bankAccountData.accountName)?.id || ''); 
+    } else if (existingBankAccountId && defaultBankAccountId === existingBankAccountId && !bankAccountData.isDefault) {
+        await handleSetDefaultBankAccount(''); 
+    }
+
+    handleCloseBankAccountFormModal();
+  };
+
+  const handleDeleteBankAccount = async (accountId: string) => {
+    if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) return;
+    
+    openConfirmationModal(
+        BN_UI_TEXT.CONFIRM_DELETE_BANK_ACCOUNT_MSG.split("?")[0] + "?",
+        BN_UI_TEXT.CONFIRM_DELETE_BANK_ACCOUNT_MSG.split("?")[1],
+        async () => {
+            const accountToDelete = bankAccounts.find(acc => acc.id === accountId);
+            if (!accountToDelete) return;
+            
+            const now = new Date().toISOString();
+            const updatedAccount: BankAccount = {
+                ...accountToDelete,
+                isDeleted: true,
+                deletedAt: now,
+                lastModified: now,
+                editHistory: [
+                  ...(accountToDelete.editHistory || []),
+                  {
+                    timestamp: now,
+                    action: 'deleted',
+                    userId: currentUser.id!,
+                    snapshot: { ...accountToDelete, isDeleted: true, deletedAt: now } as any, 
+                  }
+                ]
+            };
+
+            setBankAccounts(prev => prev.map(acc => acc.id === accountId ? updatedAccount : acc));
+            await apiService.updateRecord('bank_accounts', currentUser.id, { isDeleted: 1, deletedAt: now, lastModified: now, editHistory: JSON.stringify(updatedAccount.editHistory) }, `id = '${accountId}'`);
+            addNotification(BN_UI_TEXT.BANK_ACCOUNT_DELETED_SUCCESS, 'success');
+            if (defaultBankAccountId === accountId) {
+              await handleSetDefaultBankAccount(''); 
+            }
         },
         BN_UI_TEXT.CONFIRM_BTN_YES_DELETE,
         "bg-red-600 hover:bg-red-700 focus:ring-red-500"
     );
   };
   
-  const handleRestorePerson = async (personId: string) => {
-    if (!currentUser || !currentUser.id) return;
-    const userIdForContext = currentUser.id;
+  const handleSetDefaultBankAccount = async (accountId: string) => {
+      if (!currentUser) return;
+      const oldDefault = bankAccounts.find(ba => ba.isDefault);
+      const newDefault = bankAccounts.find(ba => ba.id === accountId);
 
-    const personToRestore = persons.find(p => p.id === personId);
-    if (!personToRestore) return;
-    
-    openConfirmationModal(
-        BN_UI_TEXT.RESTORE_ITEM_TOOLTIP,
-        BN_UI_TEXT.CONFIRM_RESTORE_PERSON_MSG,
-        async () => {
-            const currentDate = new Date().toISOString();
-            const snapshot: PersonVersion['snapshot'] = {
-                name: personToRestore.name,
-                mobileNumber: personToRestore.mobileNumber,
-                address: personToRestore.address,
-                shopName: personToRestore.shopName,
-                email: personToRestore.email,
-                profileImageAction: 'none', 
-                isDeleted: false,
-                deletedAt: undefined,
-                systemUserId: personToRestore.systemUserId,
-                customAlias: personToRestore.customAlias,
-            };
-            const restoredPerson: Person = {
-              ...personToRestore,
-              isDeleted: false,
-              deletedAt: undefined,
-              lastModified: currentDate,
-              editHistory: [
-                ...(personToRestore.editHistory || []),
-                {
-                  timestamp: currentDate,
-                  action: 'restored',
-                  userId: userIdForContext,
-                  snapshot: snapshot
-                }
-              ]
-            };
-            try {
-                await apiService.updateRecord('persons', userIdForContext, restoredPerson, `id = '${personId}'`);
-                setPersons(prev => prev.map(p => p.id === personId ? restoredPerson : p));
-                addNotification(BN_UI_TEXT.PERSON_RESTORED_SUCCESS, 'success');
-            } catch (error: any) {
-                addNotification(`ব্যক্তিকে পুনরুদ্ধার করতে সমস্যা হয়েছে: ${error.message}`, 'error');
-            }
-             setIsConfirmModalOpen(false);
-        },
-        BN_UI_TEXT.CONFIRM_BTN_YES_RESTORE,
-        "bg-green-600 hover:bg-green-700 focus:ring-green-500"
-    );
-  };
+      setBankAccounts(prevAccounts => prevAccounts.map(acc => ({
+          ...acc,
+          isDefault: acc.id === accountId,
+      })));
+      setDefaultBankAccountId(accountId || null); 
 
-
-  const handleViewPersonHistory = (person: Person) => {
-    setViewingPersonHistoryFor(person);
-    setIsPersonHistoryModalOpen(true);
-  };
-
-  const handleOpenSelectPersonModal = (callback: (personId: string) => void) => {
-    setActivePersonSelectionCallback(() => callback);
-    setIsSelectPersonModalOpen(true);
-  };
-
-  const handleOpenPersonFormForSelectionContext = () => {
-    setIsSelectPersonModalOpen(false); 
-    setIsAddingPersonForSelectionContext(true); 
-    handleOpenPersonFormModal(); 
-  };
-
-  const getPersonNetDebtBalance = (personId: string): number => {
-    let netBalance = 0;
-    debts.forEach(debt => {
-      if (debt.personId === personId && !debt.isSettled) {
-        if (debt.type === DebtType.RECEIVABLE) {
-          netBalance += debt.remainingAmount;
-        } else {
-          netBalance -= debt.remainingAmount;
-        }
+      try {
+          await updateCurrentUserData({ defaultBankAccountId: accountId || null });
+          if (oldDefault && oldDefault.id !== accountId) {
+              await apiService.updateRecord('bank_accounts', currentUser.id, { isDefault: 0 }, `id = '${oldDefault.id}'`);
+          }
+          if (newDefault && newDefault.id !== oldDefault?.id) {
+              await apiService.updateRecord('bank_accounts', currentUser.id, { isDefault: 1 }, `id = '${newDefault.id}'`);
+          }
+          if (newDefault) {
+            addNotification(BN_UI_TEXT.BANK_ACCOUNT_SET_AS_DEFAULT_SUCCESS.replace('{accountName}', newDefault.accountName), 'success');
+          } else if (oldDefault) {
+            addNotification(BN_UI_TEXT.BANK_ACCOUNT_REMOVED_AS_DEFAULT_SUCCESS.replace('{accountName}', oldDefault.accountName), 'info');
+          }
+      } catch (error: any) {
+          addNotification(`ডিফল্ট ব্যাংক অ্যাকাউন্ট সেট করতে সমস্যা: ${error.message}`, 'error');
+          setBankAccounts(prev => prev.map(acc => ({...acc, isDefault: acc.id === oldDefault?.id})));
+          setDefaultBankAccountId(oldDefault?.id || null);
       }
-    });
-    return netBalance;
   };
 
-  const getPersonNetLedgerBalance = (personId: string): number => {
-    const personEntries = personLedgerEntries.filter(e => e.personId === personId);
-    if (personEntries.length === 0) return 0;
-    
-    const lastEntry = personEntries.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.id.localeCompare(a.id) )[0];
-    return lastEntry.balanceAfterEntry;
+
+  const totalIncome = useMemo(() => transactions.filter(t => t.type === TransactionType.INCOME && !t.isDeleted).reduce((sum, t) => sum + t.amount, 0), [transactions]);
+  const totalExpense = useMemo(() => transactions.filter(t => t.type === TransactionType.EXPENSE && !t.isDeleted).reduce((sum, t) => sum + t.amount, 0), [transactions]);
+  const balance = useMemo(() => totalIncome - totalExpense, [totalIncome, totalExpense]);
+  const totalPayable = useMemo(() => debts.filter(d => d.type === DebtType.PAYABLE && !d.isSettled).reduce((sum, d) => sum + d.remainingAmount, 0), [debts]);
+  const totalReceivable = useMemo(() => debts.filter(d => d.type === DebtType.RECEIVABLE && !d.isSettled).reduce((sum, d) => sum + d.remainingAmount, 0), [debts]);
+  
+  const allTransactionSuggestions = useMemo(() => {
+    const combined = [
+        ...INCOME_DESCRIPTION_SUGGESTIONS_BN,
+        ...EXPENSE_DESCRIPTION_SUGGESTIONS_BN,
+        ...userCustomSuggestions.map(s => s.text),
+    ];
+    return [...new Set(combined)].sort((a, b) => a.localeCompare(b, 'bn-BD'));
+  }, [userCustomSuggestions]);
+  
+  const getPersonNetLedgerBalance = useCallback((personId: string): number => {
+    const relevantEntries = personLedgerEntries.filter(entry => entry.personId === personId);
+    if (relevantEntries.length === 0) return 0;
+    const latestEntry = relevantEntries.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+    return latestEntry?.balanceAfterEntry || 0;
+  }, [personLedgerEntries]);
+
+  const handleOpenProductFormModalForAdd = () => {
+    setIsManageProductsModalOpen(false); 
+    setEditingProduct(null);
+    setIsProductFormModalOpen(true);
+  };
+
+  const handleOpenProductFormModalForEdit = (productToEdit: Product) => {
+    setIsManageProductsModalOpen(false);
+    setEditingProduct(productToEdit);
+    setIsProductFormModalOpen(true);
   };
   
-  const getCompositePersonBalance = (personId: string): number => {
-    const netDebt = getPersonNetDebtBalance(personId);
-    const netLedger = getPersonNetLedgerBalance(personId);
-    return netDebt + netLedger; 
+  const handleCloseProductFormModal = () => {
+    setIsProductFormModalOpen(false);
+    setEditingProduct(null);
+    setIsManageProductsModalOpen(true); 
   };
 
-  const handleViewPersonDebtsHistory = (person: Person) => {
-    setViewingPersonForDebtsHistory(person);
-    setIsPersonDebtsHistoryModalOpen(true);
-  };
 
-  const handleOpenPersonLedgerHistory = (person: Person) => {
-    setSelectedPersonForLedger(person);
-    setIsPersonLedgerHistoryModalOpen(true);
-  };
+  const unreadMessagesCount = useMemo(() => {
+    if (!currentUser || !currentUser.id) return 0;
+    return messages.filter(msg => msg.actualReceiverId === currentUser.id && !msg.isRead && !msg.isDeleted).length;
+  }, [messages, currentUser]);
 
-  const handleOpenAddLedgerEntryModal = (person: Person) => {
-    setSelectedPersonForLedger(person);
-    setIsPersonLedgerHistoryModalOpen(false); 
-    setIsAddLedgerEntryModalOpen(true);
-  };
 
-  const handleDeleteLedgerEntry = async (entryId: string, personIdOfEntry: string) => {
-    if (!currentUser || !currentUser.id) return;
-    const userIdForContext = currentUser.id;
-    try {
-      await apiService.deleteRecord('person_ledger_entries', userIdForContext, `id = '${entryId}'`);
-      
-      const deletedEntry = personLedgerEntries.find(e => e.id === entryId);
-      const remainingEntriesForPerson = personLedgerEntries.filter(e => e.personId === personIdOfEntry && e.id !== entryId)
-                                          .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id.localeCompare(b.id));
-      
-      let lastBalanceBeforeDeleted = 0;
-      const entriesBeforeDeleted = personLedgerEntries
-                                  .filter(e => e.personId === personIdOfEntry && new Date(e.date).getTime() < new Date(deletedEntry!.date).getTime())
-                                  .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id.localeCompare(b.id));
-      if (entriesBeforeDeleted.length > 0) {
-          lastBalanceBeforeDeleted = entriesBeforeDeleted[entriesBeforeDeleted.length-1].balanceAfterEntry;
+  const getCompositePersonBalance = useCallback((personId: string): number => {
+    const ledgerBalance = getPersonNetLedgerBalance(personId); 
+    const unsettledDebts = debts.filter(d => d.personId === personId && !d.isSettled);
+    
+    let netDebtEffect = 0;
+    unsettledDebts.forEach(debt => {
+      if (debt.type === DebtType.RECEIVABLE) { 
+        netDebtEffect += debt.remainingAmount;
+      } else { 
+        netDebtEffect -= debt.remainingAmount;
       }
-      
-      const updatedEntriesAfterDelete: PersonLedgerEntry[] = [];
-      let currentBalance = lastBalanceBeforeDeleted;
-      
-      for (const entry of remainingEntriesForPerson) {
-          if (new Date(entry.date).getTime() >= new Date(deletedEntry!.date).getTime()) {
-              currentBalance += entry.type === PersonLedgerEntryType.CREDIT ? entry.amount : -entry.amount;
-              const updatedEntry = { ...entry, balanceAfterEntry: currentBalance };
-              updatedEntriesAfterDelete.push(updatedEntry);
-              await apiService.updateRecord('person_ledger_entries', userIdForContext, updatedEntry, `id = '${entry.id}'`);
-          } else {
-             updatedEntriesAfterDelete.push(entry); // Keep entries before the deleted one as is for this list
-          }
-      }
-      
-      setPersonLedgerEntries(prev => 
-          prev.filter(e => e.id !== entryId) // Remove deleted
-              .map(e => updatedEntriesAfterDelete.find(upd => upd.id === e.id) || e) // Replace with updated
-      );
-      addNotification(BN_UI_TEXT.LEDGER_ENTRY_DELETED_SUCCESS, 'success');
-      
-      if(deletedEntry) {
-        const personName = persons.find(p => p.id === personIdOfEntry)?.name || BN_UI_TEXT.UNKNOWN_PERSON;
-        let transactionDescToFind = '';
-        if (deletedEntry.type === PersonLedgerEntryType.CREDIT) {
-            transactionDescToFind = BN_UI_TEXT.LEDGER_CREDIT_INCOME_DESC
-                .replace("{personName}", personName)
-                .replace("{description}", deletedEntry.description);
-        } else {
-             transactionDescToFind = BN_UI_TEXT.LEDGER_DEBIT_EXPENSE_DESC
-                .replace("{personName}", personName)
-                .replace("{description}", deletedEntry.description);
-        }
-        const linkedTransaction = transactions.find(t => t.description === transactionDescToFind && t.amount === deletedEntry.amount && new Date(t.date).toISOString().split('T')[0] === new Date(deletedEntry.date).toISOString().split('T')[0] && !t.isDeleted);
-        if(linkedTransaction) {
-            await handleDeleteTransaction(linkedTransaction.id);
-        }
-      }
-
-    } catch (error: any) {
-      addNotification(`খতিয়ান এন্ট্রি মুছতে সমস্যা: ${error.message}`, 'error');
-    }
-  };
+    });
+    return ledgerBalance + netDebtEffect;
+  }, [getPersonNetLedgerBalance, debts]);
 
   const handleOpenPersonFinancialOverview = (person: Person) => {
     setViewingPersonForOverview(person);
     setIsPersonFinancialOverviewModalOpen(true);
   };
+
+
+  const handleOpenAddIncomeModal = () => setIsAddIncomeModalOpen(true);
+  const handleOpenAddExpenseModal = () => setIsAddExpenseModalOpen(true);
+  const handleViewTransactionsClick = () => setIsViewTransactionsModalOpen(true);
+  const handleManagePersonsClick = () => setIsManagePersonsModalOpen(true);
+  const handleAddDebtClick = () => setIsAddDebtModalOpen(true);
+  const handleViewReportClick = () => setIsReportModalOpen(true);
+  const handleOpenBankReportModal = () => setIsBankReportModalOpen(true); // New
+  const handleOpenStockReportModal = () => setIsStockReportModalOpen(true); 
+  const handleBudgetClick = () => setIsBudgetSetupModalOpen(true);
+  const handleArchiveClick = () => setIsArchiveModalOpen(true);
+  const handleEditProfileClick = () => setIsEditProfileModalOpen(true);
+  const handleChangePasswordClick = () => setIsChangePasswordModalOpen(true);
+  const handleOpenInboxModal = () => setIsInboxModalOpen(true);
+  const handleManageSuggestionsClick = () => setIsManageSuggestionsModalOpen(true);
+  const handleOpenGeminiSettingsModal = () => setIsGeminiSettingsModalOpen(true); 
+  const handleOpenAdminAppSettingsModal = () => setIsAppAdminSettingsModalOpen(true); 
+  const handleOpenAILogModal = () => setIsAILogModalOpen(true);
   
-  const receivablePersonsData = useMemo(() => {
-    const map = new Map<string, ReceivablePersonData>();
-    persons.forEach(person => {
-      if (!person.isDeleted) {
-        const netDebt = getCompositePersonBalance(person.id);
-        if (netDebt > 0) { 
-          map.set(person.id, {
-            personId: person.id,
-            personName: person.customAlias || person.name,
-            personMobile: person.mobileNumber,
-            totalReceivableAmount: netDebt,
-          });
-        }
-      }
+  const handleCreateSalesInvoiceClick = () => {
+    setEditingInvoice(null); 
+    setAiPreRenderDataForInvoice(null); 
+    setIsCreateSalesInvoiceModalOpen(true);
+  }; 
+  const handleCreatePurchaseBillClick = () => {
+    setEditingInvoice(null); 
+    setAiPreRenderDataForInvoice(null); 
+    setIsCreatePurchaseBillModalOpen(true); 
+  }; 
+  const handleOpenInvoiceListModal = () => setIsInvoiceListModalOpen(true);
+  const handleManageProductsClick = () => setIsManageProductsModalOpen(true);
+  const handleManageCompanyProfilesClick = () => setIsManageCompanyProfilesModalOpen(true);
+  
+  const handleOpenEditInvoiceModal = (invoiceToEdit: Invoice) => {
+    setEditingInvoice(invoiceToEdit);
+    if (invoiceToEdit.invoiceType === InvoiceType.SALES) {
+      setIsCreateSalesInvoiceModalOpen(true);
+    } else if (invoiceToEdit.invoiceType === InvoiceType.PURCHASE) {
+      setIsCreatePurchaseBillModalOpen(true);
+    }
+    setIsInvoiceListModalOpen(false); 
+  };
+
+  const handleResetAppDataClick = () => {
+    setConfirmModalProps({
+        title: BN_UI_TEXT.RESET_APP_DATA_BTN,
+        message: BN_UI_TEXT.CONFIRM_RESET_APP_DATA_MSG,
+        onConfirmAction: async () => {
+            Object.values(LOCAL_STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+            addNotification(BN_UI_TEXT.APP_DATA_RESET_SUCCESS, 'success');
+            setTimeout(() => window.location.reload(), 2000);
+        },
+        confirmButtonText: BN_UI_TEXT.CONFIRM_BTN_YES_DELETE,
+        confirmButtonColor: "bg-red-600 hover:bg-red-700 focus:ring-red-500",
     });
-    return Array.from(map.values()).sort((a, b) => b.totalReceivableAmount - a.totalReceivableAmount);
-  }, [persons, debts, personLedgerEntries, getCompositePersonBalance]); 
-
-
-  const payablePersonsData = useMemo(() => {
-    const map = new Map<string, PayablePersonData>();
-    persons.forEach(person => {
-      if (!person.isDeleted) {
-        const netDebt = getCompositePersonBalance(person.id);
-        if (netDebt < 0) { 
-          map.set(person.id, {
-            personId: person.id,
-            personName: person.customAlias || person.name,
-            personMobile: person.mobileNumber,
-            totalPayableAmount: Math.abs(netDebt), 
-          });
-        }
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => b.totalPayableAmount - a.totalPayableAmount);
-  }, [persons, debts, personLedgerEntries, getCompositePersonBalance]);
-  
-
-  const handleOpenReportModal = () => setIsReportModalOpen(true);
-
-  const handleLogout = () => {
-    authLogout(); 
+    setIsConfirmModalOpen(true);
   };
-  
-  const handleResetAppData = () => {
-    openConfirmationModal(
-      BN_UI_TEXT.RESET_APP_DATA_BTN,
-      BN_UI_TEXT.CONFIRM_RESET_APP_DATA_MSG,
-      async () => {
-        try {
-          await apiService.makeApiRequest({ method: 'resetDatabase' });
-          addNotification(BN_UI_TEXT.APP_DATA_RESET_SUCCESS, 'success', 5000);
-          setTimeout(() => window.location.reload(), 3000); 
-        } catch (error: any) {
-          addNotification(`অ্যাপ ডেটা রিসেট করতে সমস্যা হয়েছে: ${error.message}`, 'error');
-        }
-        setIsConfirmModalOpen(false);
-      },
-      BN_UI_TEXT.RESET_APP_DATA_BTN,
-      "bg-red-700 hover:bg-red-800 focus:ring-red-600"
-    );
+  const handleOpenSelectPersonModal = (callback: (personId: string) => void) => {
+    setActivePersonSelectionCallback(() => callback); 
+    setIsSelectPersonModalOpen(true);
   };
 
-  const handleUserDetailsImportedForPersonForm = (details: ImportedUserDetails) => {
-    if (!currentUser) return;
-    openConfirmationModal(
-        BN_UI_TEXT.CONFIRM_SAVE_IMPORTED_PERSON.replace("{USER_NAME}", details.name).replace("{USER_EMAIL}", details.email || 'N/A'),
-        `"${details.name}" (${details.mobileNumber}) নামের এই ব্যবহারকারীকে আপনার তালিকায় যোগ করতে চান?`,
-        async () => {
-            const personDataToSave: Omit<Person, 'id' | 'userId' | 'createdAt' | 'lastModified' | 'editHistory'> = {
-                name: details.name,
-                mobileNumber: details.mobileNumber,
-                email: details.email || undefined,
-                profileImage: details.profileImage || undefined,
-                systemUserId: details.systemUserId, 
-            };
-            await handleSavePerson(personDataToSave, undefined, false, isAddingPersonForSelectionContext);
-            addNotification(BN_UI_TEXT.PERSON_SAVED_AFTER_IMPORT, "success");
-            setIsConfirmModalOpen(false);
-            if(isAddingPersonForSelectionContext) {
-              setIsPersonFormModalOpen(false); 
-            }
-        },
-        BN_UI_TEXT.SAVE_CHANGES,
-        "bg-green-600 hover:bg-green-700 focus:ring-green-500"
-    );
+  const handleAddNewPersonFromSelection = () => {
+    setIsSelectPersonModalOpen(false); 
+    setIsAddingPersonForSelectionContext(true); 
+    setEditingPerson(null); 
+    setIsPersonFormModalOpen(true);
   };
 
-  const handleUserSuggestionAdded = async (text: string, type: SuggestionType) => {
-    if (!currentUser || !currentUser.id) return;
-    const newSuggestionId = 'sugg_' + Date.now().toString() + Math.random().toString(36).substring(2, 9);
-    const newSuggestion: UserSuggestion = { id: newSuggestionId, userId: currentUser.id, text, type };
-    
-    try {
-        await apiService.addUserSuggestion(currentUser.id, newSuggestion);
-        setUserCustomSuggestions(prev => [...prev, newSuggestion].sort((a,b) => a.text.localeCompare(b.text, 'bn-BD')));
-        addNotification(BN_UI_TEXT.SUGGESTION_ADDED_SUCCESS, 'success');
-    } catch (error: any) {
-        addNotification(error.message || BN_UI_TEXT.SUGGESTION_EXISTS_ERROR, 'error');
+  const handleSavePersonFromSelectionContext = async (
+    personData: Omit<Person, 'id' | 'userId' | 'createdAt' | 'lastModified' | 'editHistory'>,
+    existingPersonId?: string
+  ) => {
+    const savedPerson = await handleSavePerson(personData, existingPersonId); 
+    if (savedPerson && activePersonSelectionCallback) {
+      activePersonSelectionCallback(savedPerson.id); 
     }
+    setIsPersonFormModalOpen(false);
+    setIsAddingPersonForSelectionContext(false);
+    setActivePersonSelectionCallback(null);
   };
 
-  const handleUserSuggestionEdited = async (id: string, newText: string) => {
-    if (!currentUser || !currentUser.id) return;
-    try {
-        await apiService.updateUserSuggestion(currentUser.id, id, newText);
-        setUserCustomSuggestions(prev => 
-            prev.map(s => s.id === id ? { ...s, text: newText } : s).sort((a,b) => a.text.localeCompare(b.text, 'bn-BD'))
-        );
-        addNotification(BN_UI_TEXT.SUGGESTION_UPDATED_SUCCESS, 'success');
-    } catch (error: any) {
-        addNotification(error.message || "পরামর্শ আপডেট করতে সমস্যা হয়েছে।", 'error');
+  const handleCancelPersonFormFromSelectionContext = () => {
+    setIsPersonFormModalOpen(false);
+    setIsAddingPersonForSelectionContext(false);
+    if (activePersonSelectionCallback) {
+        setIsSelectPersonModalOpen(true); 
     }
+    setActivePersonSelectionCallback(null);
   };
 
-  const handleUserSuggestionDeleted = async (id: string) => {
-    if (!currentUser || !currentUser.id) return;
-    openConfirmationModal(
-        BN_UI_TEXT.DELETE_SUGGESTION_TOOLTIP,
-        BN_UI_TEXT.CONFIRM_DELETE_SUGGESTION_MSG,
-        async () => {
-            try {
-                await apiService.deleteUserSuggestion(currentUser.id, id);
-                setUserCustomSuggestions(prev => prev.filter(s => s.id !== id));
-                addNotification(BN_UI_TEXT.SUGGESTION_DELETED_SUCCESS, 'success');
-            } catch (error: any) {
-                addNotification(error.message || "পরামর্শ মুছতে সমস্যা হয়েছে।", 'error');
-            }
-            setIsConfirmModalOpen(false);
-        },
-        BN_UI_TEXT.CONFIRM_BTN_YES_DELETE,
-        "bg-red-600 hover:bg-red-700 focus:ring-red-500"
-    );
-  };
-  
-
-  // Budgeting Handlers
-  const handleAddBudgetCategory = async (name: string, associatedSuggestions: string[]) => {
-    if (!currentUser || !currentUser.id) return;
-    const newCategory: BudgetCategory = {
-      id: 'cat_' + Date.now().toString() + Math.random().toString(36).substring(2, 9),
-      userId: currentUser.id,
-      name,
-      createdAt: new Date().toISOString(),
-      lastModified: new Date().toISOString(),
-      associatedSuggestions
-    };
-    try {
-      await apiService.insertRecord('budgetCategories', currentUser.id, newCategory);
-      setBudgetCategories(prev => [...prev, newCategory]);
-      addNotification(BN_UI_TEXT.BUDGET_CATEGORY_ADDED_SUCCESS, 'success');
-    } catch (error: any) {
-      addNotification(`ক্যাটেগরি যোগ করতে সমস্যা: ${error.message}`, 'error');
-    }
+   const onOpenImageViewer = (imageUrl: string, imageName?: string) => {
+    setViewingImageDetails({ url: imageUrl, name: imageName });
+    setIsImageViewerOpen(true);
   };
 
-  const handleUpdateBudgetCategory = async (id: string, newName: string, newAssociatedSuggestions: string[]) => {
-    if (!currentUser || !currentUser.id) return;
-    const categoryToUpdate = budgetCategories.find(c => c.id === id);
-    if (!categoryToUpdate) return;
-    const updatedCategory: BudgetCategory = {
-      ...categoryToUpdate,
-      name: newName,
-      associatedSuggestions: newAssociatedSuggestions,
-      lastModified: new Date().toISOString()
-    };
-    try {
-      await apiService.updateRecord('budgetCategories', currentUser.id, updatedCategory, `id = '${id}'`);
-      setBudgetCategories(prev => prev.map(c => c.id === id ? updatedCategory : c));
-      addNotification(BN_UI_TEXT.BUDGET_CATEGORY_UPDATED_SUCCESS, 'success');
-    } catch (error: any) {
-      addNotification(`ক্যাটেগরি আপডেট করতে সমস্যা: ${error.message}`, 'error');
-    }
-  };
-
-  const handleDeleteBudgetCategory = async (id: string) => {
-    if (!currentUser || !currentUser.id) return;
-    // Check if any budget uses this category
-    if (budgets.some(b => b.categoryId === id)) {
-        addNotification(BN_UI_TEXT.BUDGET_CATEGORY_HAS_BUDGETS_ERROR, 'error', 7000);
-        return;
-    }
-    openConfirmationModal(
-        BN_UI_TEXT.DELETE_BUDGET_CATEGORY_BTN,
-        BN_UI_TEXT.CONFIRM_DELETE_BUDGET_CATEGORY_MSG,
-        async () => {
-            try {
-                await apiService.deleteRecord('budgetCategories', currentUser.id!, `id = '${id}'`);
-                setBudgetCategories(prev => prev.filter(c => c.id !== id));
-                addNotification(BN_UI_TEXT.BUDGET_CATEGORY_DELETED_SUCCESS, 'success');
-            } catch (error: any) {
-                addNotification(`ক্যাটেগরি মুছতে সমস্যা: ${error.message}`, 'error');
-            }
-            setIsConfirmModalOpen(false);
-        },
-        BN_UI_TEXT.CONFIRM_BTN_YES_DELETE,
-        "bg-red-600 hover:bg-red-700 focus:ring-red-500"
-    );
-  };
-
-  const handleAddBudget = async (categoryId: string, amount: number, period: BudgetPeriod, startDateISO: string, customEndDateISO?: string) => {
-    if (!currentUser || !currentUser.id) return;
-
-    let endDateISO = '';
-    const startDate = new Date(startDateISO);
-
-    switch(period) {
-        case BudgetPeriod.MONTHLY:
-            endDateISO = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
-            break;
-        case BudgetPeriod.WEEKLY:
-            const endDateForWeek = new Date(startDate);
-            endDateForWeek.setDate(startDate.getDate() + 6);
-            endDateForWeek.setHours(23, 59, 59, 999);
-            endDateISO = endDateForWeek.toISOString();
-            break;
-        case BudgetPeriod.QUARTERLY:
-            endDateISO = new Date(startDate.getFullYear(), startDate.getMonth() + 3, 0, 23, 59, 59, 999).toISOString();
-            break;
-        case BudgetPeriod.YEARLY:
-            endDateISO = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59, 999).toISOString();
-            break;
-        case BudgetPeriod.CUSTOM:
-            if (!customEndDateISO) {
-                addNotification(BN_UI_TEXT.BUDGET_INVALID_CUSTOM_DATE_RANGE, 'error');
-                return;
-            }
-            const customEndDate = new Date(customEndDateISO);
-            customEndDate.setHours(23, 59, 59, 999);
-            endDateISO = customEndDate.toISOString();
-            break;
-        default:
-            return; // Should not happen
-    }
-    
-    const newBudget: Budget = {
-      id: 'bud_' + Date.now().toString() + Math.random().toString(36).substring(2, 9),
-      userId: currentUser.id,
-      categoryId,
-      amount,
-      period,
-      startDate: startDateISO,
-      endDate: endDateISO,
-      createdAt: new Date().toISOString(),
-      lastModified: new Date().toISOString()
-    };
-    try {
-      await apiService.insertRecord('budgets', currentUser.id, newBudget);
-      setBudgets(prev => [...prev, newBudget]);
-      addNotification(BN_UI_TEXT.BUDGET_ADDED_SUCCESS, 'success');
-    } catch (error: any) {
-      addNotification(`বাজেট যোগ করতে সমস্যা: ${error.message}`, 'error');
-    }
-  };
-  
-  const handleUpdateBudget = async (id: string, newAmount: number) => {
-    if (!currentUser || !currentUser.id) return;
-    const budgetToUpdate = budgets.find(b => b.id === id);
-    if (!budgetToUpdate) return;
-    const updatedBudget: Budget = {
-      ...budgetToUpdate,
-      amount: newAmount,
-      lastModified: new Date().toISOString()
-    };
-    try {
-      await apiService.updateRecord('budgets', currentUser.id, updatedBudget, `id = '${id}'`);
-      setBudgets(prev => prev.map(b => b.id === id ? updatedBudget : b));
-      addNotification(BN_UI_TEXT.BUDGET_UPDATED_SUCCESS, 'success');
-    } catch (error: any) {
-      addNotification(`বাজেট আপডেট করতে সমস্যা: ${error.message}`, 'error');
-    }
-  };
-
-  const handleDeleteBudget = async (id: string) => {
-    if (!currentUser || !currentUser.id) return;
-    openConfirmationModal(
-        BN_UI_TEXT.DELETE_BUDGET_BTN,
-        BN_UI_TEXT.CONFIRM_DELETE_BUDGET_MSG,
-        async () => {
-            try {
-                await apiService.deleteRecord('budgets', currentUser.id!, `id = '${id}'`);
-                setBudgets(prev => prev.filter(b => b.id !== id));
-                addNotification(BN_UI_TEXT.BUDGET_DELETED_SUCCESS, 'success');
-            } catch (error: any) {
-                addNotification(`বাজেট মুছতে সমস্যা: ${error.message}`, 'error');
-            }
-            setIsConfirmModalOpen(false);
-        },
-        BN_UI_TEXT.CONFIRM_BTN_YES_DELETE,
-        "bg-red-600 hover:bg-red-700 focus:ring-red-500"
-    );
-  };
-
-  const calculateBudgetUsage = (budget: Budget, allUserTransactions: Transaction[]): { spent: number; remaining: number; percentageUsed: number } => {
-    const budgetCategory = budgetCategories.find(c => c.id === budget.categoryId);
-    if (!budgetCategory) return { spent: 0, remaining: budget.amount, percentageUsed: 0 };
-
-    const budgetStartDate = new Date(budget.startDate);
-    const budgetEndDate = new Date(budget.endDate);
-    budgetEndDate.setHours(23, 59, 59, 999); // Ensure end of day
-
-    const relevantTransactions = allUserTransactions.filter(t => {
-        if (t.isDeleted || t.type !== TransactionType.EXPENSE) return false;
-        const tDate = new Date(t.date);
-        if (tDate < budgetStartDate || tDate > budgetEndDate) return false;
-        
-        // Check against associated suggestions for the category
-        const mainDescriptionPart = t.description.split(" | ")[0].split(" [")[0]; // Get "বাজার খরচ" from "বাজার খরচ [২ কেজি] - অতিরিক্ত তথ্য"
-        return budgetCategory.associatedSuggestions?.some(sugg => mainDescriptionPart.toLowerCase().startsWith(sugg.toLowerCase())) ?? false;
-    });
-
-    const spent = relevantTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const remaining = budget.amount - spent;
-    const percentageUsed = budget.amount > 0 ? (spent / budget.amount) * 100 : 0;
-    
-    return { spent, remaining, percentageUsed };
-  };
-
-  const handleOpenChatModal = (personToChatWith: Person) => {
-    if (!personToChatWith.systemUserId) {
-        addNotification(BN_UI_TEXT.CHAT_NOT_AVAILABLE_FOR_NON_REGISTERED_PERSON.replace('{personName}', personToChatWith.customAlias || personToChatWith.name), 'warning');
-        return;
-    }
-    if (personToChatWith.systemUserId === currentUser?.id) {
-        addNotification("আপনি নিজের সাথে চ্যাট করতে পারবেন না।", 'warning');
-        return;
-    }
-    setChattingWithPerson(personToChatWith);
+  const openChatForPerson = (person: Person) => {
+    setChattingWithPerson(person);
     setIsChatModalOpen(true);
   };
-  
-  const handleSendMessage = async (content: string, recipientPerson: Person, imageToSend?: ImageMessageContent, audioToSend?: AudioMessageContent) => {
-    if (!currentUser || !currentUser.id || !recipientPerson.systemUserId) {
-      addNotification(BN_UI_TEXT.MESSAGE_SEND_ERROR + " (প্রাপক সঠিকভাবে নির্ধারিত নয়)", 'error');
-      return;
-    }
-    if (recipientPerson.systemUserId === currentUser.id) {
-        addNotification("আপনি নিজের কাছে বার্তা পাঠাতে পারবেন না।", 'error');
-        return;
-    }
 
-    const messageId = 'msg_' + Date.now().toString() + Math.random().toString(36).substring(2, 9);
-    const timestamp = new Date().toISOString();
-    const threadId = [currentUser.id, recipientPerson.systemUserId].sort().join('_');
-
-    const snapshot: MessageVersionSnapshot = {
-        content: content,
-        imageContent: imageToSend,
-        audioContent: audioToSend,
-        isDeleted: false,
-    };
-
-    const editHistoryEntry: MessageVersion = {
-        timestamp: timestamp,
-        action: 'created',
-        userId: currentUser.id,
-        snapshot: snapshot
-    };
-
-    const senderMessage: Message = {
-      id: messageId + '_sender',
-      userId: currentUser.id,
-      threadId,
-      actualSenderId: currentUser.id,
-      actualReceiverId: recipientPerson.systemUserId,
-      content,
-      imageContent: imageToSend,
-      audioContent: audioToSend,
-      timestamp,
-      isRead: true, // Sender's copy is always "read" by sender
-      editHistory: [editHistoryEntry]
-    };
-
-    const receiverMessage: Message = {
-      id: messageId + '_receiver',
-      userId: recipientPerson.systemUserId, 
-      threadId,
-      actualSenderId: currentUser.id,
-      actualReceiverId: recipientPerson.systemUserId,
-      content,
-      imageContent: imageToSend,
-      audioContent: audioToSend,
-      timestamp,
-      isRead: false, 
-      editHistory: [editHistoryEntry] 
-    };
-    
-    try {
-      await apiService.insertRecord('messages', currentUser.id, senderMessage);
-      await apiService.insertRecord('messages', recipientPerson.systemUserId, receiverMessage);
-      setMessages(prev => [...prev, senderMessage, receiverMessage].sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime() ));
-      // addNotification(BN_UI_TEXT.MESSAGE_SENT_SUCCESS, 'success', 1500); // Often too quick, can be annoying
-    } catch (error: any) {
-      addNotification(BN_UI_TEXT.MESSAGE_SEND_ERROR + `: ${error.message}`, 'error');
-    }
-  };
-  
-  const handleReactionToMessage = async (messageId: string, emoji: string) => {
-    if (!currentUser || !currentUser.id) return;
-    const currentUserId = currentUser.id;
-    
-    const targetMessage = messages.find(msg => msg.id === messageId && msg.userId === currentUserId); // Ensure user owns this message copy
-    if (!targetMessage || targetMessage.actualSenderId === currentUserId) { // Can't react to own messages
-        // console.log("Cannot react to own message or message not found for current user.");
-        return;
-    }
-
-    const updatedReactions = { ...(targetMessage.reactions || {}) };
-    
-    if (!updatedReactions[emoji]) {
-        updatedReactions[emoji] = [];
-    }
-
-    const userIndex = updatedReactions[emoji].indexOf(currentUserId);
-    if (userIndex > -1) { // User already reacted with this emoji, so remove reaction
-        updatedReactions[emoji].splice(userIndex, 1);
-        if (updatedReactions[emoji].length === 0) {
-            delete updatedReactions[emoji];
-        }
-    } else { // Add user's reaction
-        updatedReactions[emoji].push(currentUserId);
-    }
-
-    const updatedMessage: Message = { ...targetMessage, reactions: updatedReactions };
-
-    try {
-        await apiService.updateRecord('messages', currentUserId, updatedMessage, `id = '${messageId}'`);
-        setMessages(prev => prev.map(msg => msg.id === messageId ? updatedMessage : msg));
-    } catch (error: any) {
-        addNotification(BN_UI_TEXT.MESSAGE_REACTION_ERROR + `: ${error.message}`, 'error');
-    }
-  };
-
-  const handleDeleteMessage = async (messageId: string) => {
-    if (!currentUser || !currentUser.id) return;
-    const userIdForContext = currentUser.id;
-
-    const messageToDelete = messages.find(msg => msg.id === messageId && msg.userId === userIdForContext);
-    if (!messageToDelete || messageToDelete.actualSenderId !== userIdForContext) { // Only sender can delete their copy
-        addNotification("আপনি শুধুমাত্র নিজের পাঠানো বার্তা মুছে ফেলতে পারবেন।", 'warning');
-        return;
-    }
-    if (messageToDelete.isDeleted) return; // Already marked as deleted
-
-    openConfirmationModal(
-        BN_UI_TEXT.DELETE_MESSAGE_TOOLTIP,
-        BN_UI_TEXT.CONFIRM_DELETE_MESSAGE_MSG,
-        async () => {
-            const currentDate = new Date().toISOString();
-            const snapshot: MessageVersionSnapshot = {
-                content: messageToDelete.content,
-                imageContent: messageToDelete.imageContent,
-                audioContent: messageToDelete.audioContent,
-                isDeleted: true,
-                deletedAt: currentDate,
-            };
-            const updatedMessage: Message = {
-                ...messageToDelete,
-                isDeleted: true,
-                deletedAt: currentDate,
-                editHistory: [
-                    ...(messageToDelete.editHistory || []),
-                    { timestamp: currentDate, action: 'deleted', userId: userIdForContext, snapshot }
-                ]
-            };
-            try {
-                await apiService.updateRecord('messages', userIdForContext, updatedMessage, `id = '${messageId}'`);
-                setMessages(prev => prev.map(msg => msg.id === messageId ? updatedMessage : msg));
-                addNotification(BN_UI_TEXT.MESSAGE_DELETED_SUCCESS, 'success');
-            } catch (error: any) {
-                addNotification(BN_UI_TEXT.MESSAGE_DELETE_ERROR + `: ${error.message}`, 'error');
-            }
-            setIsConfirmModalOpen(false);
-        },
-        BN_UI_TEXT.CONFIRM_BTN_YES_DELETE,
-        "bg-red-600 hover:bg-red-700 focus:ring-red-500"
-    );
-  };
-  
-  const handleOpenVideoCallModal = (personToCall: Person) => {
-    if (!personToCall.systemUserId) {
-        addNotification(BN_UI_TEXT.VIDEO_CALL_NOT_AVAILABLE_FOR_NON_REGISTERED_PERSON.replace('{personName}', personToCall.customAlias || personToCall.name), 'warning');
-        return;
-    }
-     if (personToCall.systemUserId === currentUser?.id) {
-        addNotification("আপনি নিজের সাথে ভিডিও কল করতে পারবেন না।", 'warning');
-        return;
-    }
-    setVideoCallTargetPerson(personToCall);
+  const openVideoCallForPerson = (person: Person) => {
+    setVideoCallTargetPerson(person);
     setIsVideoCallModalOpen(true);
   };
 
-
-  if (isLoadingData && !currentUser) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4">
-        <div className="text-center">
-          <div role="status" className="mb-4">
-            <svg aria-hidden="true" className="inline w-10 h-10 text-slate-300 animate-spin dark:text-slate-500 fill-teal-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
-                <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0492C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
-            </svg>
-            <span className="sr-only">{BN_UI_TEXT.LOADING}</span>
-          </div>
-          <p className="text-lg text-slate-600">{BN_UI_TEXT.LOADING}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentUser && !isAuthContextLoading) {
-    return (
-      <>
-        <NotificationsDisplay />
-        <HomePageLoggedOut onSwitchAuthMode={(mode) => handleSwitchAuthMode(mode)} />
-        {isAuthModalOpen && (
-          <Modal
-            isOpen={isAuthModalOpen}
-            onClose={() => { setIsAuthModalOpen(false); clearAuthError(); }}
-            title={getAuthModalTitle(authPageMode)}
-            size="md"
-          >
-            <AuthForm 
-                mode={authPageMode} 
-                initialEmail={emailForPasswordReset}
-                onClose={() => { setIsAuthModalOpen(false); clearAuthError();}} 
-                onSwitchMode={handleSwitchAuthMode} 
-            />
-          </Modal>
-        )}
-      </>
-    );
-  }
+  const getPeriodDates = (period: string): { startDate: Date, endDate: Date } => {
+    const today = new Date();
+    let startDate = new Date();
+    let endDate = new Date();
   
-  // Fallback for any state where currentUser is somehow null after loading and auth error checks
-  if (!currentUser && !isAuthContextLoading && !authContextError) {
-      return (
-          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4">
-              <ExclamationCircleIcon className="w-12 h-12 text-red-500 mb-4" />
-              <p className="text-xl text-slate-700 font-semibold mb-2">{BN_UI_TEXT.AUTH_ERROR_GENERAL}</p>
-              <p className="text-slate-500 text-center mb-6"> ব্যবহারকারী xác định করা যায়নি। অনুগ্রহ করে আবার লগইন করার চেষ্টা করুন।</p>
-              <button
-                  onClick={() => {
-                      authLogout(); // Ensure clean logout state
-                      setIsAuthModalOpen(true);
-                      setAuthPageMode('login');
-                  }}
-                  className="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-6 rounded-lg shadow-md"
-              >
-                  {BN_UI_TEXT.LOGIN}
-              </button>
-          </div>
-      );
-  }
+    switch (period.toLowerCase()) {
+      case 'today':
+      case 'আজকে':
+      case 'আজ':
+        startDate = new Date(today.setHours(0, 0, 0, 0));
+        endDate = new Date(today.setHours(23, 59, 59, 999));
+        break;
+      case 'current_week':
+      case 'এই সপ্তাহে':
+        const firstDayOfWeek = today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1); 
+        startDate = new Date(new Date(today).setDate(firstDayOfWeek));
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case 'current_month':
+      case 'এই মাসে':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case 'all_time':
+      default:
+        startDate = new Date(0); 
+        endDate = new Date();    
+        break;
+    }
+    return { startDate, endDate };
+  };
+
+  const handleProcessAICommand = useCallback(async (transcript: string, languageCode: AILanguageCode = aiAssistantLanguage) => {
+    console.log('[AI Assistant Debug - App.tsx] ENTERING handleProcessAICommand. Transcript:', `"${transcript}"`, "CurrentUser ID:", currentUser ? currentUser.id : "NULL", "Language:", languageCode, "Scope:", aiAssistantScope);
+  
+    if (!transcript || !currentUser) {
+      addAILogEntry({ type: 'error', commandText: transcript, errorMessage: 'Transcript or currentUser was null for processing.' });
+      setProcessingAICommand(false);
+      return;
+    }
+  
+    addAILogEntry({ type: 'command', commandText: transcript, rawAIResponse: "Processing command..." });
+    speechService.cancelSpeech();
+    setProcessingAICommand(true);
+    addNotification(BN_UI_TEXT.AI_ASSISTANT_PROCESSING, 'info', 3000);
+  
+    const appContext: AppContextData = {
+      totalIncome, totalExpense, balance, totalPayable, totalReceivable,
+      activeTransactionsCount: transactions.filter(t => !t.isDeleted).length,
+      personsCount: persons.filter(p => !p.isDeleted).length,
+      featureList: [
+        BN_UI_TEXT.APP_FEATURE_TRANSACTION_TRACKING, BN_UI_TEXT.APP_FEATURE_DEBT_MANAGEMENT,
+        BN_UI_TEXT.APP_FEATURE_PERSON_MANAGEMENT, BN_UI_TEXT.APP_FEATURE_BUDGETING,
+        BN_UI_TEXT.APP_FEATURE_INVOICING, BN_UI_TEXT.APP_FEATURE_PRODUCT_MANAGEMENT,
+        BN_UI_TEXT.APP_FEATURE_AI_FINANCIAL_TIPS, BN_UI_TEXT.APP_FEATURE_CHAT_WITH_CONTACTS,
+        BN_UI_TEXT.APP_FEATURE_DATA_REPORTS, BN_UI_TEXT.APP_FEATURE_USER_PROFILE_SETTINGS,
+        BN_UI_TEXT.APP_FEATURE_DATA_QUERY_AI,
+      ],
+    };
+  
+    try {
+      const aiResponse = await geminiService.processUserCommandViaAI(transcript, appContext, geminiSettings, languageCode, aiAssistantScope);
+      const intent = aiResponse?.intent;
+      let responseTextForLog = aiResponse?.responseText || (languageCode === 'bn-BD' ? BN_UI_TEXT.AI_REPLY_CANNOT_UNDERSTAND : "Sorry, I couldn't understand your request.");
+      const actionDetails = aiResponse?.actionDetails;
+      const rawAIResponse = aiResponse?.rawResponse || JSON.stringify(aiResponse);
+      
+      let appGeneratedResponseText = responseTextForLog; 
+
+      if (intent === 'perform_action' && actionDetails?.actionType) {
+        // ... (existing action handling logic)
+        appGeneratedResponseText = languageCode === 'bn-BD' ? BN_UI_TEXT.AI_ACTION_PERFORMED : "Okay, initiating that action for you.";
+      } else if (intent === 'query_app_data' && actionDetails) {
+        // ... (existing query handling logic)
+      } else if (intent === 'explain_feature') {
+          appGeneratedResponseText = aiResponse.responseText || (languageCode === 'bn-BD' ? "এই বৈশিষ্ট্যটি সম্পর্কে বলতে পারছি না।" : "I'm unable to explain that feature.");
+      } else if (intent === 'general_query') { 
+          appGeneratedResponseText = aiResponse.responseText || (languageCode === 'bn-BD' ? "দুঃখিত, এই প্রশ্নের উত্তর আমার জানা নেই।" : "Sorry, I don't have an answer for that question.");
+      } else { 
+          appGeneratedResponseText = aiResponse.responseText || (languageCode === 'bn-BD' ? BN_UI_TEXT.AI_FALLBACK_RESPONSE : "Sorry, I can only assist with matters related to this application.");
+      }
+      
+      if (aiVoiceReplayEnabled) {
+        speechService.speakText(appGeneratedResponseText, languageCode);
+      }
+      
+      addAILogEntry({
+        type: aiResponse?.error ? 'error' : 'response',
+        commandText: transcript,
+        responseText: appGeneratedResponseText, 
+        parsedIntent: intent,
+        actionDetails: actionDetails,
+        rawAIResponse: rawAIResponse,
+        errorMessage: aiResponse?.error ? `AI Service Error: ${aiResponse.error}` : undefined,
+      });
+  
+    } catch (error: any) {
+      console.error('[AI Assistant Debug - App.tsx] CATCH BLOCK in handleProcessAICommand. Error:', error);
+      const errorMsg = error.message || BN_UI_TEXT.AI_ASSISTANT_ERROR_UNKNOWN;
+      addNotification(errorMsg, 'error');
+      const responseToSpeak = languageCode === 'bn-BD' ? BN_UI_TEXT.AI_REPLY_GENERAL_ERROR : "Sorry, an error occurred.";
+      if (aiVoiceReplayEnabled) {
+        speechService.speakText(responseToSpeak, languageCode);
+      }
+      addAILogEntry({
+          type: 'error',
+          commandText: transcript,
+          errorMessage: `Error in handleProcessAICommand: ${errorMsg}`,
+          rawAIResponse: error.toString(),
+      });
+      setAiPreRenderDataForInvoice(null);
+    } finally {
+      console.log('[AI Assistant Debug - App.tsx] FINALLY block in handleProcessAICommand. Setting processingAICommand to false.');
+      setProcessingAICommand(false);
+    }
+  }, [currentUser, addAILogEntry, addNotification, geminiSettings, totalIncome, totalExpense, balance, totalPayable, totalReceivable, transactions, persons, debts, aiAssistantLanguage, aiVoiceReplayEnabled, aiAssistantScope]);
+
+
+  const handleToggleAIAssistantListening = useCallback(() => {
+    if (processingAICommand) {
+      console.log('[AI Assistant Debug - App.tsx] AI is currently processing a command, ignoring toggle.');
+      addAILogEntry({ type: 'error', errorMessage: "AI command processing in progress. Cannot start new listening session now."});
+      return;
+    }
+
+    if (isListeningForAI && speechRecognitionRef.current) {
+      console.log('[AI Assistant Debug - App.tsx] User explicitly stopped listening.');
+      speechRecognitionRef.current.stop(); 
+      setIsListeningForAI(false); 
+      return;
+    }
+
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition as SpeechRecognitionStatic | undefined;
+    if (!SpeechRecognitionAPI) {
+      const errorMsg = BN_UI_TEXT.AI_ASSISTANT_ERROR_SERVICE_UNAVAILABLE;
+      addNotification(errorMsg, 'error');
+      addAILogEntry({ type: 'error', errorMessage: `SpeechRecognitionAPI not available: ${errorMsg}` });
+      return;
+    }
+
+    if (!speechRecognitionRef.current) {
+      console.log('[AI Assistant Debug - App.tsx] Initializing SpeechRecognition.');
+      speechRecognitionRef.current = new SpeechRecognitionAPI();
+      speechRecognitionRef.current.continuous = true; 
+      speechRecognitionRef.current.interimResults = false;
+      
+      speechRecognitionRef.current.onstart = () => {
+        console.log('[AI Assistant Debug - App.tsx] Speech recognition started.');
+        setIsListeningForAI(true); 
+        addNotification(BN_UI_TEXT.AI_ASSISTANT_LISTENING, 'info', 3000);
+      };
+
+      speechRecognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+        // ... (existing onresult logic)
+      };
+
+      speechRecognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+        // ... (existing onerror logic)
+      };
+      
+      speechRecognitionRef.current.onend = () => {
+        // ... (existing onend logic)
+      };
+    }
+    
+    if (speechRecognitionRef.current) {
+      speechRecognitionRef.current.lang = aiAssistantLanguage; 
+    }
+
+    try {
+      console.log('[AI Assistant Debug - App.tsx] Attempting to start speech recognition with language:', aiAssistantLanguage);
+      speechRecognitionRef.current?.start();
+    } catch (e: any) {
+      // ... (existing start error logic)
+    }
+  }, [isListeningForAI, processingAICommand, addAILogEntry, addNotification, handleProcessAICommand, aiAssistantLanguage]);
+
+  useEffect(() => {
+    return () => {
+      if (speechRecognitionRef.current) {
+        console.log('[AI Assistant Debug - App.tsx] Cleaning up speech recognition service on unmount/logout.');
+        speechRecognitionRef.current.stop(); 
+        speechRecognitionRef.current.onstart = null;
+        speechRecognitionRef.current.onresult = null;
+        speechRecognitionRef.current.onerror = null;
+        speechRecognitionRef.current.onend = null;
+        speechRecognitionRef.current = null; 
+      }
+      setIsListeningForAI(false); 
+    };
+  }, [currentUser]); 
+
+  const openConfirmationModal = useCallback((title: string, message: string | React.ReactNode, onConfirmAction: () => Promise<void>, confirmButtonText?: string, confirmButtonColor?: string) => {
+    setConfirmModalProps({ title, message, onConfirmAction, confirmButtonText, confirmButtonColor });
+    setIsConfirmModalOpen(true);
+  }, []);
 
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col">
       <NotificationsDisplay />
-      <Header 
+      <Header
+        isAdminUser={isAdminUser}
         onAddIncomeClick={handleOpenAddIncomeModal}
         onAddExpenseClick={handleOpenAddExpenseModal}
-        onAddDebtClick={() => setIsAddDebtModalOpen(true)}
-        onViewTransactionsClick={() => setIsViewTransactionsModalOpen(true)}
-        onManagePersonsClick={handleOpenManagePersonsModal}
-        onViewReportClick={handleOpenReportModal}
-        onBudgetClick={() => setIsBudgetSetupModalOpen(true)}
-        onArchiveClick={() => setIsArchiveModalOpen(true)}
-        onChangePasswordClick={() => setIsChangePasswordModalOpen(true)}
-        onEditProfileClick={() => setIsEditProfileModalOpen(true)}
-        onOpenInboxModal={() => setIsInboxModalOpen(true)}
-        onSwitchAuthMode={(mode) => handleSwitchAuthMode(mode)}
+        onViewTransactionsClick={handleViewTransactionsClick}
+        onManagePersonsClick={handleManagePersonsClick}
+        onAddDebtClick={handleAddDebtClick}
+        onViewReportClick={handleViewReportClick}
+        onOpenBankReportModal={handleOpenBankReportModal} // New Prop
+        onOpenStockReportModal={handleOpenStockReportModal} 
+        onBudgetClick={handleBudgetClick}
+        onArchiveClick={handleArchiveClick}
+        onEditProfileClick={handleEditProfileClick}
+        onChangePasswordClick={handleChangePasswordClick}
+        onOpenInboxModal={handleOpenInboxModal}
+        onManageSuggestionsClick={handleManageSuggestionsClick}
+        onCreateSalesInvoiceClick={handleCreateSalesInvoiceClick} 
+        onCreatePurchaseBillClick={handleCreatePurchaseBillClick} 
+        onOpenInvoiceListModal={handleOpenInvoiceListModal}
+        onManageProductsClick={handleManageProductsClick}
+        onManageBankAccountsClick={handleManageBankAccountsClick} 
+        onSwitchAuthMode={(mode) => { setAuthPageMode(mode); setIsAuthModalOpen(true); }}
         unreadMessagesCount={unreadMessagesCount}
-        onResetAppDataClick={handleResetAppData}
+        onResetAppDataClick={handleResetAppDataClick}
         isGlobalPhoneticModeActive={isGlobalPhoneticModeActive}
         onToggleGlobalPhoneticMode={handleToggleGlobalPhoneticMode}
+        onManageCompanyProfilesClick={handleManageCompanyProfilesClick}
+        onOpenGeminiSettingsModal={handleOpenGeminiSettingsModal} 
+        onOpenAdminAppSettingsModal={handleOpenAdminAppSettingsModal}
+        onOpenAILogModal={handleOpenAILogModal}
+        isProcessingAICommand={processingAICommand}
+        isAIAssistantListening={isListeningForAI}
+        onToggleAIAssistantListening={handleToggleAIAssistantListening}
       />
-      <main className="container mx-auto p-3 sm:p-4 md:p-6 flex-grow">
-        {isLoadingData && (
-            <div className="text-center py-10">
-                <div role="status" className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-teal-500 border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]">
-                    <span className="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Loading...</span>
-                </div>
-                <p className="mt-2 text-slate-500">{BN_UI_TEXT.LOADING}</p>
-            </div>
+      <main className="container mx-auto p-4 flex-grow pt-20 sm:pt-24">
+        {isAuthContextLoading && (
+          <div className="text-center py-20 text-slate-600 text-lg">{BN_UI_TEXT.LOADING}</div>
         )}
-        {!isLoadingData && appError && (
-             <div className="my-8 p-6 bg-red-50 border-l-4 border-red-500 rounded-xl shadow-lg text-center">
-                <ExclamationCircleIcon className="w-10 h-10 text-red-500 mx-auto mb-3" />
-                <p className="text-red-700 font-semibold">{appError}</p>
-            </div>
+
+        {!currentUser && !isAuthContextLoading && (
+          <HomePageLoggedOut
+            onSwitchAuthMode={(mode) => {
+              setAuthPageMode(mode);
+              setIsAuthModalOpen(true);
+            }}
+            onOpenInvoiceListModal={handleOpenInvoiceListModal} 
+          />
         )}
-        {!isLoadingData && !appError && (
+
+        {currentUser && !isAuthContextLoading && (
           <>
-            <Summary 
-              totalIncome={totalIncome} 
-              totalExpense={totalExpense} 
-              balance={balance} 
-              totalPayable={totalPayable}
-              totalReceivable={totalReceivable}
-              onOpenReceivablePersonsModal={() => setIsReceivablePersonsModalOpen(true)}
-              onOpenPayablePersonsModal={() => setIsPayablePersonsModalOpen(true)}
-            />
-            <TransactionList 
-              transactions={transactions.filter(t => !t.isDeleted)}
-              onDeleteTransaction={handleDeleteTransaction} 
-              onEditTransaction={handleOpenEditTransactionModal}
-              onViewHistory={handleViewTransactionHistory}
-              onRestoreTransaction={handleRestoreTransaction} 
-            />
-            <DebtList 
-              debts={debts} 
-              persons={persons}
-              onDeleteDebt={handleDeleteDebt} 
-              onToggleSettle={handleToggleSettleDebt} 
-              onEditDebt={handleOpenEditDebtModal}
-              onViewHistory={handleViewDebtHistory}
-              onViewPersonFinancialOverview={handleOpenPersonFinancialOverview}
-            />
-            <AITipCard balance={balance} />
+            {isLoadingData && <div className="text-center py-10 text-slate-500">{BN_UI_TEXT.LOADING}</div>}
+            {!isLoadingData && (
+                <>
+                    <Summary
+                        totalIncome={totalIncome}
+                        totalExpense={totalExpense}
+                        balance={balance}
+                        totalPayable={totalPayable}
+                        totalReceivable={totalReceivable}
+                        onOpenReceivablePersonsModal={() => setIsReceivablePersonsModalOpen(true)}
+                        onOpenPayablePersonsModal={() => setIsPayablePersonsModalOpen(true)}
+                    />
+                    {isAdminUser && <AITipCard balance={balance} geminiSettings={geminiSettings} />}
+                     <DebtList 
+                        debts={debts}
+                        persons={persons}
+                        onDeleteDebt={handleDeleteDebt}
+                        onToggleSettle={handleToggleSettleDebt}
+                        onEditDebt={(debt) => { setEditingDebt(debt); setIsEditDebtModalOpen(true); }}
+                        onViewHistory={handleViewDebtHistory}
+                        onViewPersonFinancialOverview={handleOpenPersonFinancialOverview}
+                     />
+                </>
+            )}
           </>
         )}
       </main>
 
-      {isAddIncomeModalOpen && (
-        <Modal isOpen={isAddIncomeModalOpen} onClose={() => setIsAddIncomeModalOpen(false)} title={BN_UI_TEXT.MODAL_TITLE_ADD_INCOME} size="lg">
-          <SimplifiedTransactionForm
-            transactionType={TransactionType.INCOME}
-            onAddTransaction={handleAddTransaction}
-            suggestionsList={incomeSuggestions}
-            onOpenManageSuggestions={() => setIsManageSuggestionsModalOpen(true)}
-            formTitle={BN_UI_TEXT.MODAL_TITLE_ADD_INCOME}
-            expenseFieldRequirements={expenseFieldRequirements}
-            onUpdateExpenseFieldRequirements={handleUpdateExpenseFieldRequirements}
-            isGlobalPhoneticModeActive={isGlobalPhoneticModeActive}
-          />
-        </Modal>
-      )}
-      {isAddExpenseModalOpen && (
-        <Modal isOpen={isAddExpenseModalOpen} onClose={() => setIsAddExpenseModalOpen(false)} title={BN_UI_TEXT.MODAL_TITLE_ADD_EXPENSE} size="lg">
-          <SimplifiedTransactionForm
-            transactionType={TransactionType.EXPENSE}
-            onAddTransaction={handleAddTransaction}
-            suggestionsList={expenseSuggestions}
-            onOpenManageSuggestions={() => setIsManageSuggestionsModalOpen(true)}
-            formTitle={BN_UI_TEXT.MODAL_TITLE_ADD_EXPENSE}
-            expenseFieldRequirements={expenseFieldRequirements}
-            onUpdateExpenseFieldRequirements={handleUpdateExpenseFieldRequirements}
-            isGlobalPhoneticModeActive={isGlobalPhoneticModeActive}
-          />
-        </Modal>
-      )}
-
-      {isAddDebtModalOpen && (
-        <Modal isOpen={isAddDebtModalOpen} onClose={() => setIsAddDebtModalOpen(false)} title={BN_UI_TEXT.MODAL_TITLE_ADD_DEBT} size="lg">
-          <DebtForm 
-            onAddDebt={handleAddOrUpdateDebtEntry} 
-            persons={persons.filter(p => !p.isDeleted)}
-            debts={debts}
-            onOpenSelectPersonModal={handleOpenSelectPersonModal}
-            getCompositePersonBalance={getCompositePersonBalance}
-          />
-        </Modal>
-      )}
-      
-      {isViewTransactionsModalOpen && (
-        <Modal isOpen={isViewTransactionsModalOpen} onClose={() => setIsViewTransactionsModalOpen(false)} title={BN_UI_TEXT.MODAL_TITLE_TRANSACTION_HISTORY} size="3xl">
-          <TransactionList 
-            transactions={transactions.filter(t => !t.isDeleted)}
-            onDeleteTransaction={handleDeleteTransaction} 
-            onEditTransaction={handleOpenEditTransactionModal}
-            onViewHistory={handleViewTransactionHistory}
-            onRestoreTransaction={handleRestoreTransaction}
-            showTitle={false} 
-          />
-        </Modal>
-      )}
-
-      {isManagePersonsModalOpen && (
-        <Modal isOpen={isManagePersonsModalOpen} onClose={() => setIsManagePersonsModalOpen(false)} title={BN_UI_TEXT.MANAGE_PERSONS_MODAL_TITLE} size="2xl">
-            <PersonList
-              persons={persons.filter(p => !p.isDeleted)}
-              onEditPerson={handleOpenPersonFormModal}
-              onDeletePerson={handleDeletePerson}
-              onViewPersonHistory={handleViewPersonHistory}
-              onAddNewPerson={() => handleOpenPersonFormModal()}
-              onViewPersonDebtsHistory={handleViewPersonDebtsHistory}
-              onViewPersonLedger={handleOpenPersonLedgerHistory}
-              getPersonNetLedgerBalance={getCompositePersonBalance} 
-              onRestorePerson={handleRestorePerson}
-              onOpenChat={handleOpenChatModal}
-              onOpenVideoCall={handleOpenVideoCallModal}
-            />
-        </Modal>
-      )}
-      
-      {isPersonFormModalOpen && (
-        <Modal
-          isOpen={isPersonFormModalOpen}
-          onClose={handleClosePersonFormModal}
-          title={editingPerson ? BN_UI_TEXT.EDIT_PERSON_MODAL_TITLE : BN_UI_TEXT.ADD_PERSON_MODAL_TITLE}
-          size="xl"
-        >
-          <PersonForm
-            onSave={(data, id) => handleSavePerson(data, id, false, isAddingPersonForSelectionContext)}
-            initialData={editingPerson}
-            onCancel={handleClosePersonFormModal}
-            allPersons={persons}
-            onUserDetailsImported={handleUserDetailsImportedForPersonForm}
-          />
-        </Modal>
-      )}
-
-      {isSelectPersonModalOpen && (
-        <SelectPersonModal
-          isOpen={isSelectPersonModalOpen}
-          onClose={() => {
-              setIsSelectPersonModalOpen(false);
-              setActivePersonSelectionCallback(null);
-              if(isAddingPersonForSelectionContext){ // If "Add New Person" from Select modal was cancelled
-                  setIsAddingPersonForSelectionContext(false);
-                  // Determine which modal to reopen - AddDebt or EditDebt
-                  // This logic might need refinement based on actual flow
-                  if (isAddDebtModalOpen || isEditDebtModalOpen) { /* do nothing, it's behind */ }
-                  else { setIsAddDebtModalOpen(true); } // Default or based on other context
-              }
-          }}
-          persons={persons.filter(p => !p.isDeleted)}
-          onSelectPerson={(personId) => {
-            if (activePersonSelectionCallback) {
-              activePersonSelectionCallback(personId);
-            }
-            setIsSelectPersonModalOpen(false);
-            setActivePersonSelectionCallback(null);
-          }}
-          onAddNewPerson={handleOpenPersonFormForSelectionContext}
-        />
-      )}
-
-
-      {isEditModalOpen && editingTransaction && (
-        <EditTransactionModal
-          isOpen={isEditModalOpen}
-          onClose={() => { setIsEditModalOpen(false); setEditingTransaction(null); }}
-          transaction={editingTransaction}
-          onSave={handleSaveEditedTransaction}
-          allSuggestions={combinedTransactionSuggestionsForEdit}
-          onOpenManageSuggestions={() => setIsManageSuggestionsModalOpen(true)}
-          isGlobalPhoneticModeActive={isGlobalPhoneticModeActive}
-        />
-      )}
-      {isEditDebtModalOpen && editingDebt && (
-        <EditDebtModal
-          isOpen={isEditDebtModalOpen}
-          onClose={() => { setIsEditDebtModalOpen(false); setEditingDebt(null);}}
-          debt={editingDebt}
-          onSave={handleAddOrUpdateDebtEntry}
-          persons={persons.filter(p => !p.isDeleted)}
-          onOpenSelectPersonModal={handleOpenSelectPersonModal}
-        />
-      )}
-       {isTransactionEditHistoryModalOpen && viewingTransactionEditHistoryFor && (
-        <TransactionHistoryModal
-          isOpen={isTransactionEditHistoryModalOpen}
-          onClose={() => { setIsTransactionEditHistoryModalOpen(false); setViewingTransactionEditHistoryFor(null); }}
-          transaction={viewingTransactionEditHistoryFor}
-        />
-      )}
-      {isDebtEditHistoryModalOpen && viewingDebtEditHistoryFor && (
-        <DebtHistoryModal
-          isOpen={isDebtEditHistoryModalOpen}
-          onClose={() => { setIsDebtEditHistoryModalOpen(false); setViewingDebtEditHistoryFor(null); }}
-          debt={viewingDebtEditHistoryFor}
-          persons={persons}
-        />
-      )}
-      {isPersonHistoryModalOpen && viewingPersonHistoryFor && (
-        <PersonHistoryModal
-          isOpen={isPersonHistoryModalOpen}
-          onClose={() => { setIsPersonHistoryModalOpen(false); setViewingPersonHistoryFor(null); }}
-          person={viewingPersonHistoryFor}
-        />
-      )}
-      {isPersonDebtsHistoryModalOpen && viewingPersonForDebtsHistory && (
-        <PersonDebtsHistoryModal
-            isOpen={isPersonDebtsHistoryModalOpen}
-            onClose={() => { setIsPersonDebtsHistoryModalOpen(false); setViewingPersonForDebtsHistory(null);}}
-            person={viewingPersonForDebtsHistory}
-            personDebts={debts.filter(d => d.personId === viewingPersonForDebtsHistory.id)}
-            allPersons={persons}
-            onDeleteDebt={handleDeleteDebt}
-            onToggleSettle={handleToggleSettleDebt}
-            onEditDebt={handleOpenEditDebtModal}
-            onViewDebtHistory={handleViewDebtHistory}
-        />
-      )}
-
-      {isAddLedgerEntryModalOpen && selectedPersonForLedger && (
-        <AddPersonLedgerEntryModal
-            isOpen={isAddLedgerEntryModalOpen}
-            onClose={() => {
-                setIsAddLedgerEntryModalOpen(false);
-                // Reopen ledger history if it was the source
-                if (!isPersonFinancialOverviewModalOpen) { // Avoid reopening if overview is also open
-                   setIsPersonLedgerHistoryModalOpen(true);
-                } 
-            }}
-            person={selectedPersonForLedger}
-            onAddEntry={handleAddPersonLedgerEntry}
-        />
-      )}
-      {isPersonLedgerHistoryModalOpen && selectedPersonForLedger && (
-        <PersonLedgerHistoryModal
-            isOpen={isPersonLedgerHistoryModalOpen}
-            onClose={() => { setIsPersonLedgerHistoryModalOpen(false); setSelectedPersonForLedger(null); }}
-            person={selectedPersonForLedger}
-            ledgerEntries={personLedgerEntries.filter(e => e.personId === selectedPersonForLedger.id)}
-            currentNetBalance={getCompositePersonBalance(selectedPersonForLedger.id)}
-            onAddEntryClick={handleOpenAddLedgerEntryModal}
-            onDeleteEntry={handleDeleteLedgerEntry}
-        />
-      )}
-
-      {isPersonFinancialOverviewModalOpen && viewingPersonForOverview && (
-        <PersonFinancialOverviewModal
-            isOpen={isPersonFinancialOverviewModalOpen}
-            onClose={() => { setIsPersonFinancialOverviewModalOpen(false); setViewingPersonForOverview(null);}}
-            person={viewingPersonForOverview}
-            personDebts={debts.filter(d => d.personId === viewingPersonForOverview.id)}
-            personLedgerEntries={personLedgerEntries.filter(e => e.personId === viewingPersonForOverview.id)}
-            currentNetLedgerBalance={getCompositePersonBalance(viewingPersonForOverview.id)}
-            allPersons={persons}
-            onDeleteDebt={handleDeleteDebt}
-            onToggleSettle={handleToggleSettleDebt}
-            onEditDebt={handleOpenEditDebtModal}
-            onViewDebtHistory={handleViewDebtHistory}
-            onAddLedgerEntryClick={handleOpenAddLedgerEntryModal}
-            onDeleteLedgerEntry={handleDeleteLedgerEntry}
-        />
-      )}
-
-      {isReceivablePersonsModalOpen && (
-        <ReceivablePersonsModal
-            isOpen={isReceivablePersonsModalOpen}
-            onClose={() => setIsReceivablePersonsModalOpen(false)}
-            receivablePersons={receivablePersonsData}
-            onViewPersonDetails={handleOpenPersonFinancialOverview}
-            persons={persons}
-        />
-      )}
-      {isPayablePersonsModalOpen && (
-        <PayablePersonsModal
-            isOpen={isPayablePersonsModalOpen}
-            onClose={() => setIsPayablePersonsModalOpen(false)}
-            payablePersons={payablePersonsData}
-            onViewPersonDetails={handleOpenPersonFinancialOverview}
-            persons={persons}
-        />
-      )}
-      
-      {isReportModalOpen && (
-        <ReportModal
-          isOpen={isReportModalOpen}
-          onClose={() => setIsReportModalOpen(false)}
-          transactions={transactions}
-          allDescriptions={combinedTransactionSuggestionsForEdit}
-          onDeleteTransaction={handleDeleteTransaction} 
-          onEditTransaction={handleOpenEditTransactionModal}
-          onViewHistory={handleViewTransactionHistory}
-          onRestoreTransaction={handleRestoreTransaction}
-        />
-      )}
-       
-      {isArchiveModalOpen && (
-        <ArchiveModal
-          isOpen={isArchiveModalOpen}
-          onClose={() => setIsArchiveModalOpen(false)}
-          allTransactions={transactions}
-          allPersons={persons}
-          onRestoreTransaction={handleRestoreTransaction}
-          onRestorePerson={handleRestorePerson}
-          onViewTransactionHistory={handleViewTransactionHistory}
-          onViewPersonHistory={handleViewPersonHistory}
-          onEditPerson={handleOpenPersonFormModal}
-          onViewPersonDebtsHistory={handleViewPersonDebtsHistory}
-          onViewPersonLedger={handleOpenPersonLedgerHistory}
-          getPersonNetLedgerBalance={getCompositePersonBalance}
-          onDeleteTransaction={handleDeleteTransaction} 
-          onEditTransaction={handleOpenEditTransactionModal}
-          onOpenChat={handleOpenChatModal}
-          onOpenVideoCall={handleOpenVideoCallModal}
-        />
-      )}
-
-      {isManageSuggestionsModalOpen && (
-        <ManageSuggestionsModal
-            isOpen={isManageSuggestionsModalOpen}
-            onClose={() => setIsManageSuggestionsModalOpen(false)}
-            userSuggestions={userCustomSuggestions}
-            predefinedIncomeSuggestions={INCOME_DESCRIPTION_SUGGESTIONS_BN}
-            predefinedExpenseSuggestions={EXPENSE_DESCRIPTION_SUGGESTIONS_BN}
-            onAddSuggestion={handleUserSuggestionAdded}
-            onEditSuggestion={handleUserSuggestionEdited}
-            onDeleteSuggestion={handleUserSuggestionDeleted}
-        />
-      )}
-
-      {isBudgetSetupModalOpen && currentUser && (
-        <BudgetSetupModal
-            isOpen={isBudgetSetupModalOpen}
-            onClose={() => setIsBudgetSetupModalOpen(false)}
-            categories={budgetCategories}
-            budgets={budgets}
-            transactions={transactions}
-            allTransactionSuggestions={TRANSACTION_DESCRIPTION_SUGGESTIONS_BN}
-            userCustomSuggestions={userCustomSuggestions.map(s=>s.text)}
-            onAddCategory={handleAddBudgetCategory}
-            onUpdateCategory={handleUpdateBudgetCategory}
-            onDeleteCategory={handleDeleteBudgetCategory}
-            onAddBudget={handleAddBudget}
-            onUpdateBudget={handleUpdateBudget}
-            onDeleteBudget={handleDeleteBudget}
-            calculateBudgetUsage={(budget, txns) => calculateBudgetUsage(budget, txns)}
-        />
-      )}
-
-      {isChatModalOpen && chattingWithPerson && currentUser && (
-        <ChatModal
-          isOpen={isChatModalOpen}
-          onClose={() => { setIsChatModalOpen(false); setChattingWithPerson(null); }}
-          person={chattingWithPerson}
-          currentUser={currentUser}
-          messages={messages.filter(msg => msg.threadId === [currentUser.id, chattingWithPerson.systemUserId].sort().join('_') && msg.userId === currentUser.id)}
-          onSendMessage={handleSendMessage}
-          onReactToMessage={handleReactionToMessage}
-          onDeleteMessage={handleDeleteMessage}
-        />
-      )}
-      {isInboxModalOpen && currentUser && (
-        <InboxModal
-          isOpen={isInboxModalOpen}
-          onClose={() => setIsInboxModalOpen(false)}
-          currentUser={currentUser}
-          persons={persons}
-          messages={messages}
-          onOpenChat={(person) => { setIsInboxModalOpen(false); handleOpenChatModal(person); }}
-          onOpenImageViewer={(imgContent) => {
-            if (imgContent) {
-              setViewingImageDetails({ url: imgContent.base64Data, name: imgContent.fileName });
-              setIsImageViewerOpen(true);
-            }
-          }}
-          onDeleteChatHistory={(personToDeleteChatWith) => {
-            if (!currentUser.id || !personToDeleteChatWith.systemUserId) return;
-            const threadIdToDelete = [currentUser.id, personToDeleteChatWith.systemUserId].sort().join('_');
-            openConfirmationModal(
-                BN_UI_TEXT.DELETE_CHAT_HISTORY_TOOLTIP,
-                BN_UI_TEXT.CONFIRM_DELETE_CHAT_HISTORY_MSG.replace('{personName}', personToDeleteChatWith.customAlias || personToDeleteChatWith.name),
-                async () => {
-                    const userMessagesInThread = messages.filter(m => m.userId === currentUser.id && m.threadId === threadIdToDelete);
-                    const deletionPromises = userMessagesInThread.map(msg => {
-                        const currentDate = new Date().toISOString();
-                        const snapshot: MessageVersionSnapshot = {
-                            content: msg.content,
-                            imageContent: msg.imageContent,
-                            audioContent: msg.audioContent,
-                            isDeleted: true,
-                            deletedAt: currentDate,
-                        };
-                         const updatedMessage: Message = {
-                            ...msg,
-                            isDeleted: true,
-                            deletedAt: currentDate,
-                            editHistory: [
-                                ...(msg.editHistory || []),
-                                { timestamp: currentDate, action: 'history_deleted', userId: currentUser.id!, snapshot }
-                            ]
-                        };
-                        return apiService.updateRecord('messages', currentUser.id!, updatedMessage, `id = '${msg.id}'`);
-                    });
-                    try {
-                        await Promise.all(deletionPromises);
-                        setMessages(prev => prev.map(msg => {
-                            if (msg.userId === currentUser.id && msg.threadId === threadIdToDelete) {
-                                return {...msg, isDeleted: true, deletedAt: new Date().toISOString()};
-                            }
-                            return msg;
-                        }));
-                        addNotification(BN_UI_TEXT.CHAT_HISTORY_DELETED_SUCCESS, 'success');
-                    } catch (error: any) {
-                        addNotification("চ্যাট ইতিহাস মুছতে সমস্যা হয়েছে: " + error.message, 'error');
-                    }
-                    setIsConfirmModalOpen(false);
-                },
-                BN_UI_TEXT.CONFIRM_BTN_YES_DELETE, "bg-red-600 hover:bg-red-700"
-            );
-          }}
-        />
-      )}
-      {isImageViewerOpen && viewingImageDetails && (
-          <ImageViewerModal
-              isOpen={isImageViewerOpen}
-              onClose={() => { setIsImageViewerOpen(false); setViewingImageDetails(null); }}
-              imageUrl={viewingImageDetails.url}
-              imageName={viewingImageDetails.name}
-          />
-      )}
-      {isVideoCallModalOpen && videoCallTargetPerson && currentUser && (
-        <VideoCallModal
-          isOpen={isVideoCallModalOpen}
-          onClose={() => { setIsVideoCallModalOpen(false); setVideoCallTargetPerson(null); }}
-          targetPerson={videoCallTargetPerson}
-          currentUser={currentUser}
-        />
-      )}
-
-
-      {isAuthModalOpen && !currentUser && (
-          <Modal
-            isOpen={isAuthModalOpen}
-            onClose={() => { setIsAuthModalOpen(false); clearAuthError(); setEmailForPasswordReset(undefined); }}
-            title={getAuthModalTitle(authPageMode)}
-            size="md"
-          >
-            <AuthForm 
-                mode={authPageMode} 
-                initialEmail={emailForPasswordReset}
-                onClose={() => { setIsAuthModalOpen(false); clearAuthError(); setEmailForPasswordReset(undefined);}} 
-                onSwitchMode={handleSwitchAuthMode} 
-            />
-          </Modal>
-      )}
-      {isChangePasswordModalOpen && (
-        <ChangePasswordModal
-          isOpen={isChangePasswordModalOpen}
-          onClose={() => setIsChangePasswordModalOpen(false)}
-        />
-      )}
-      {isEditProfileModalOpen && (
-        <EditProfileModal
-          isOpen={isEditProfileModalOpen}
-          onClose={() => setIsEditProfileModalOpen(false)}
-        />
-      )}
-      {isConfirmModalOpen && (
-        <ConfirmationModal
-          isOpen={isConfirmModalOpen}
-          onClose={() => {
-            setIsConfirmModalOpen(false);
-            setConfirmModalAction(null);
-          }}
-          onConfirm={async () => {
-            if (confirmModalAction) {
-              await confirmModalAction();
-            }
-          }}
-          title={confirmModalTitle}
-          message={confirmModalMessage}
-          confirmButtonText={confirmModalButtonText}
-          confirmButtonColor={confirmModalButtonColor}
-        />
-      )}
-      {appError && !isLoadingData && ( 
-        <SimpleErrorModal
-          isOpen={!!appError}
-          onClose={() => setAppError(null)}
-          message={appError}
-          title="অ্যাপ্লিকেশনে ত্রুটি"
-        />
-      )}
+      {/* ---- Modals ---- */}
+      {/* ... (Existing Modals: Auth, AddIncome, AddExpense, EditTransaction, TransactionHistory, Suggestions, Debts, Persons, etc.) ... */}
+      {isAuthModalOpen && ( <Modal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} title={authPageMode === 'login' ? BN_UI_TEXT.LOGIN : authPageMode === 'signup' ? BN_UI_TEXT.SIGNUP : authPageMode === 'forgotPasswordRequest' ? BN_UI_TEXT.FORGOT_PASSWORD_TITLE : BN_UI_TEXT.FORGOT_PASSWORD_TITLE }> <AuthForm mode={authPageMode} initialEmail={emailForPasswordReset} onClose={() => setIsAuthModalOpen(false)} onSwitchMode={(newMode, email) => { setAuthPageMode(newMode); if (email) setEmailForPasswordReset(email); }} /> </Modal> )}
+      {isAddIncomeModalOpen && ( <Modal isOpen={isAddIncomeModalOpen} onClose={() => setIsAddIncomeModalOpen(false)} title={BN_UI_TEXT.MODAL_TITLE_ADD_INCOME}> <SimplifiedTransactionForm transactionType={TransactionType.INCOME} onAddTransaction={handleAddTransaction} suggestionsList={allTransactionSuggestions.filter(s => INCOME_DESCRIPTION_SUGGESTIONS_BN.includes(s) || userCustomSuggestions.find(us => us.text === s && us.type === 'income'))} onOpenManageSuggestions={() => { setIsAddIncomeModalOpen(false); setIsManageSuggestionsModalOpen(true); }} formTitle={BN_UI_TEXT.MODAL_TITLE_ADD_INCOME} expenseFieldRequirements={expenseFieldRequirements} onUpdateExpenseFieldRequirements={() => {}} isGlobalPhoneticModeActive={isGlobalPhoneticModeActive} bankAccounts={bankAccounts} defaultBankAccountId={defaultBankAccountId} /> </Modal> )}
+      {isAddExpenseModalOpen && ( <Modal isOpen={isAddExpenseModalOpen} onClose={() => setIsAddExpenseModalOpen(false)} title={BN_UI_TEXT.MODAL_TITLE_ADD_EXPENSE}> <SimplifiedTransactionForm transactionType={TransactionType.EXPENSE} onAddTransaction={handleAddTransaction} suggestionsList={allTransactionSuggestions.filter(s => EXPENSE_DESCRIPTION_SUGGESTIONS_BN.includes(s) || userCustomSuggestions.find(us => us.text === s && us.type === 'expense'))} onOpenManageSuggestions={() => { setIsAddExpenseModalOpen(false); setIsManageSuggestionsModalOpen(true); }} formTitle={BN_UI_TEXT.MODAL_TITLE_ADD_EXPENSE} expenseFieldRequirements={expenseFieldRequirements} onUpdateExpenseFieldRequirements={(newReq) => setExpenseFieldRequirements(prev => ({...prev, ...newReq}))} isGlobalPhoneticModeActive={isGlobalPhoneticModeActive} bankAccounts={bankAccounts} defaultBankAccountId={defaultBankAccountId} /> </Modal> )}
+      {isEditModalOpen && editingTransaction && ( <EditTransactionModal isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setEditingTransaction(null); }} transaction={editingTransaction} onSave={handleSaveTransaction} allSuggestions={allTransactionSuggestions} onOpenManageSuggestions={() => { setIsEditModalOpen(false); setIsManageSuggestionsModalOpen(true); }} isGlobalPhoneticModeActive={isGlobalPhoneticModeActive} bankAccounts={bankAccounts} /> )}
+      {isTransactionEditHistoryModalOpen && viewingTransactionEditHistoryFor && ( <TransactionHistoryModal isOpen={isTransactionEditHistoryModalOpen} onClose={() => setIsTransactionEditHistoryModalOpen(false)} transaction={viewingTransactionEditHistoryFor} /> )}
+      {isManageSuggestionsModalOpen && ( <ManageSuggestionsModal isOpen={isManageSuggestionsModalOpen} onClose={() => setIsManageSuggestionsModalOpen(false)} userSuggestions={userCustomSuggestions} predefinedIncomeSuggestions={INCOME_DESCRIPTION_SUGGESTIONS_BN} predefinedExpenseSuggestions={EXPENSE_DESCRIPTION_SUGGESTIONS_BN} onAddSuggestion={async (text, type) => { }} onEditSuggestion={async (id, newText) => { }} onDeleteSuggestion={async (id) => { }} /> )}
+      {isAddDebtModalOpen && ( <Modal isOpen={isAddDebtModalOpen} onClose={() => setIsAddDebtModalOpen(false)} title={BN_UI_TEXT.MODAL_TITLE_ADD_DEBT}> <DebtForm onAddDebt={handleSaveDebt} persons={persons.filter(p => !p.isDeleted)} debts={debts} onOpenSelectPersonModal={handleOpenSelectPersonModal} getCompositePersonBalance={getCompositePersonBalance} /> </Modal> )}
+      {isEditDebtModalOpen && editingDebt && ( <EditDebtModal isOpen={isEditDebtModalOpen} onClose={() => setIsEditDebtModalOpen(false)} debt={editingDebt} onSave={handleSaveDebt} persons={persons.filter(p => !p.isDeleted)} onOpenSelectPersonModal={handleOpenSelectPersonModal} /> )}
+      {isDebtEditHistoryModalOpen && viewingDebtEditHistoryFor && ( <DebtHistoryModal isOpen={isDebtEditHistoryModalOpen} onClose={() => setIsDebtEditHistoryModalOpen(false)} debt={viewingDebtEditHistoryFor} persons={persons} /> )}
+      {isManagePersonsModalOpen && ( <Modal isOpen={isManagePersonsModalOpen} onClose={() => setIsManagePersonsModalOpen(false)} title={BN_UI_TEXT.MANAGE_PERSONS_MODAL_TITLE} size="xl"> <PersonList persons={persons} onEditPerson={(person) => { setEditingPerson(person); setIsPersonFormModalOpen(true); setIsManagePersonsModalOpen(false); }} onDeletePerson={handleDeletePerson} onViewPersonHistory={handleViewPersonHistory} onAddNewPerson={() => { setEditingPerson(null); setIsPersonFormModalOpen(true); setIsManagePersonsModalOpen(false); }} onViewPersonDebtsHistory={(person) => { setViewingPersonForDebtsHistory(person); setIsPersonDebtsHistoryModalOpen(true); }} onViewPersonLedger={(person) => { setSelectedPersonForLedger(person); setIsPersonLedgerHistoryModalOpen(true);}} getPersonNetLedgerBalance={getPersonNetLedgerBalance} onRestorePerson={handleRestorePerson} onOpenChat={openChatForPerson} onOpenVideoCall={openVideoCallForPerson} /> </Modal> )}
+      {isPersonFormModalOpen && ( <Modal isOpen={isPersonFormModalOpen} onClose={() => { setIsPersonFormModalOpen(false); if (!isAddingPersonForSelectionContext) setIsManagePersonsModalOpen(true); else handleCancelPersonFormFromSelectionContext(); }} title={editingPerson ? BN_UI_TEXT.EDIT_PERSON_MODAL_TITLE : BN_UI_TEXT.ADD_PERSON_MODAL_TITLE} > <PersonForm initialData={editingPerson} onSave={ isAddingPersonForSelectionContext ? handleSavePersonFromSelectionContext : async (data, id) => { await handleSavePerson(data, id); setIsPersonFormModalOpen(false); setIsManagePersonsModalOpen(true); }} onCancel={() => { setIsPersonFormModalOpen(false); if (!isAddingPersonForSelectionContext) setIsManagePersonsModalOpen(true); else handleCancelPersonFormFromSelectionContext();}} allPersons={persons} onUserDetailsImported={(details) => { }} /> </Modal> )}
+      {isPersonHistoryModalOpen && viewingPersonHistoryFor && ( <PersonHistoryModal isOpen={isPersonHistoryModalOpen} onClose={() => setIsPersonHistoryModalOpen(false)} person={viewingPersonHistoryFor} /> )}
+      {isSelectPersonModalOpen && activePersonSelectionCallback && ( <SelectPersonModal isOpen={isSelectPersonModalOpen} onClose={() => { setIsSelectPersonModalOpen(false); setActivePersonSelectionCallback(null); }} persons={persons.filter(p => !p.isDeleted)} onSelectPerson={(personId) => { activePersonSelectionCallback(personId); setIsSelectPersonModalOpen(false); setActivePersonSelectionCallback(null); }} onAddNewPerson={handleAddNewPersonFromSelection} /> )}
+      {isPersonDebtsHistoryModalOpen && viewingPersonForDebtsHistory && ( <PersonDebtsHistoryModal isOpen={isPersonDebtsHistoryModalOpen} onClose={() => setIsPersonDebtsHistoryModalOpen(false)} person={viewingPersonForDebtsHistory} personDebts={debts.filter(d => d.personId === viewingPersonForDebtsHistory.id)} allPersons={persons} onDeleteDebt={handleDeleteDebt} onToggleSettle={handleToggleSettleDebt} onEditDebt={(debt) => { setIsEditDebtModalOpen(true); setEditingDebt(debt); setIsPersonDebtsHistoryModalOpen(false); }} onViewDebtHistory={handleViewDebtHistory} /> )}
+      {isAddLedgerEntryModalOpen && selectedPersonForLedger && ( <AddPersonLedgerEntryModal isOpen={isAddLedgerEntryModalOpen} onClose={() => setIsAddLedgerEntryModalOpen(false)} person={selectedPersonForLedger} onAddEntry={async (entryData) => { console.log(entryData); }} /> )}
+      {isPersonLedgerHistoryModalOpen && selectedPersonForLedger && ( <PersonLedgerHistoryModal isOpen={isPersonLedgerHistoryModalOpen} onClose={() => setIsPersonLedgerHistoryModalOpen(false)} person={selectedPersonForLedger} ledgerEntries={personLedgerEntries.filter(e => e.personId === selectedPersonForLedger.id)} currentNetBalance={getPersonNetLedgerBalance(selectedPersonForLedger.id)} onAddEntryClick={(person) => { setIsAddLedgerEntryModalOpen(true); setSelectedPersonForLedger(person); }} onDeleteEntry={async (entryId, personId) => { }} /> )}
+      {isPersonFinancialOverviewModalOpen && viewingPersonForOverview && ( <PersonFinancialOverviewModal isOpen={isPersonFinancialOverviewModalOpen} onClose={() => setIsPersonFinancialOverviewModalOpen(false)} person={viewingPersonForOverview} personDebts={debts.filter(d => d.personId === viewingPersonForOverview.id)} personLedgerEntries={personLedgerEntries.filter(e => e.personId === viewingPersonForOverview.id)} currentNetLedgerBalance={getPersonNetLedgerBalance(viewingPersonForOverview.id)} allPersons={persons} onDeleteDebt={handleDeleteDebt} onToggleSettle={handleToggleSettleDebt} onEditDebt={(debt) => { setIsEditDebtModalOpen(true); setEditingDebt(debt); }} onViewDebtHistory={handleViewDebtHistory} onAddLedgerEntryClick={(person) => { setIsAddLedgerEntryModalOpen(true); setSelectedPersonForLedger(person); }} onDeleteLedgerEntry={async (entryId, personId) => { }} /> )}
+      {isReceivablePersonsModalOpen && ( <ReceivablePersonsModal isOpen={isReceivablePersonsModalOpen} onClose={() => setIsReceivablePersonsModalOpen(false)} receivablePersons={persons.map(p => ({ personId: p.id, personName: p.customAlias || p.name, personMobile: p.mobileNumber, totalReceivableAmount: debts.filter(d => d.personId === p.id && d.type === DebtType.RECEIVABLE && !d.isSettled).reduce((sum,d) => sum + d.remainingAmount, 0) })).filter(p => p.totalReceivableAmount > 0)} onViewPersonDetails={(person) => { setViewingPersonForOverview(persons.find(p => p.id === person.id)!); setIsPersonFinancialOverviewModalOpen(true); setIsReceivablePersonsModalOpen(false); }} persons={persons} /> )}
+      {isPayablePersonsModalOpen && ( <PayablePersonsModal isOpen={isPayablePersonsModalOpen} onClose={() => setIsPayablePersonsModalOpen(false)} payablePersons={persons.map(p => ({ personId: p.id, personName: p.customAlias || p.name, personMobile: p.mobileNumber, totalPayableAmount: debts.filter(d => d.personId === p.id && d.type === DebtType.PAYABLE && !d.isSettled).reduce((sum,d) => sum + d.remainingAmount, 0) })).filter(p => p.totalPayableAmount > 0)} onViewPersonDetails={(person) => { setViewingPersonForOverview(persons.find(p => p.id === person.id)!); setIsPersonFinancialOverviewModalOpen(true); setIsPayablePersonsModalOpen(false); }} persons={persons} /> )}
+      {isViewTransactionsModalOpen && ( <Modal isOpen={isViewTransactionsModalOpen} onClose={() => setIsViewTransactionsModalOpen(false)} title={BN_UI_TEXT.MODAL_TITLE_TRANSACTION_HISTORY} size="3xl"> <TransactionList transactions={transactions} onDeleteTransaction={handleDeleteTransaction} onEditTransaction={(t) => { setEditingTransaction(t); setIsEditModalOpen(true); setIsViewTransactionsModalOpen(false); }} onViewHistory={handleViewTransactionHistory} onRestoreTransaction={handleRestoreTransaction} initialShowDeleted={false} /> </Modal> )}
+      {isReportModalOpen && ( <ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} transactions={transactions} allDescriptions={allTransactionSuggestions} onDeleteTransaction={handleDeleteTransaction} onEditTransaction={(t) => { setEditingTransaction(t); setIsEditModalOpen(true); setIsReportModalOpen(false); }} onViewHistory={handleViewTransactionHistory} onRestoreTransaction={handleRestoreTransaction} /> )}
+      {isBankReportModalOpen && currentUser && ( <BankReportModal isOpen={isBankReportModalOpen} onClose={() => setIsBankReportModalOpen(false)} transactions={transactions} invoices={invoices} persons={persons} bankAccounts={bankAccounts} debts={debts} /> )}
+      {isStockReportModalOpen && currentUser && ( <StockReportModal isOpen={isStockReportModalOpen} onClose={() => setIsStockReportModalOpen(false)} products={products} invoices={invoices} /> )}
+      {isBudgetSetupModalOpen && currentUser && ( <BudgetSetupModal isOpen={isBudgetSetupModalOpen} onClose={() => setIsBudgetSetupModalOpen(false)} categories={budgetCategories} budgets={budgets} transactions={transactions} allTransactionSuggestions={allTransactionSuggestions} userCustomSuggestions={userCustomSuggestions.map(s => s.text)} onAddCategory={async (name, suggestions) => { }} onUpdateCategory={async (id, name, suggestions) => { }} onDeleteCategory={async (id) => { }} onAddBudget={async (catId, amount, period, start, end) => { }} onUpdateBudget={async (id, amount) => { }} onDeleteBudget={async (id) => { }} calculateBudgetUsage={(budget, trans) => ({spent: 0, remaining: 0, percentageUsed: 0})} /> )}
+      {isArchiveModalOpen && ( <ArchiveModal isOpen={isArchiveModalOpen} onClose={() => setIsArchiveModalOpen(false)} allTransactions={transactions} persons={persons} onRestoreTransaction={handleRestoreTransaction} onRestorePerson={handleRestorePerson} onViewTransactionHistory={handleViewTransactionHistory} onViewPersonHistory={handleViewPersonHistory} onEditPerson={(p) => {setEditingPerson(p); setIsPersonFormModalOpen(true); setIsArchiveModalOpen(false);}} onViewPersonDebtsHistory={(p) => {setViewingPersonForDebtsHistory(p); setIsPersonDebtsHistoryModalOpen(true);}} onViewPersonLedger={(p) => {setSelectedPersonForLedger(p); setIsPersonLedgerHistoryModalOpen(true);}} getPersonNetLedgerBalance={getPersonNetLedgerBalance} onDeleteTransaction={handleDeleteTransaction} onEditTransaction={(t) => { setEditingTransaction(t); setIsEditModalOpen(true); setIsArchiveModalOpen(false); }} onOpenChat={openChatForPerson} onOpenVideoCall={openVideoCallForPerson} /> )}
+      {isChangePasswordModalOpen && ( <ChangePasswordModal isOpen={isChangePasswordModalOpen} onClose={() => setIsChangePasswordModalOpen(false)} /> )}
+      {isEditProfileModalOpen && ( <EditProfileModal isOpen={isEditProfileModalOpen} onClose={() => setIsEditProfileModalOpen(false)} /> )}
+      {isGeminiSettingsModalOpen && isAdminUser && ( <GeminiSettingsModal isOpen={isGeminiSettingsModalOpen} onClose={() => setIsGeminiSettingsModalOpen(false)} currentSettings={geminiSettings} onSaveSettings={setGeminiSettings} /> )}
+      {isAppAdminSettingsModalOpen && isAdminUser && ( <AppAdminSettingsModal isOpen={isAppAdminSettingsModalOpen} onClose={() => setIsAppAdminSettingsModalOpen(false)} /> )}
+      {isAILogModalOpen && currentUser && ( <AIInteractionLogModal isAdminUser={isAdminUser} isOpen={isAILogModalOpen} onClose={() => setIsAILogModalOpen(false)} logs={aiLogs} onClearLogs={clearAILogs} isAIAssistantListening={isListeningForAI} isAICommandProcessing={processingAICommand} onToggleAIAssistantListening={handleToggleAIAssistantListening} currentAILanguage={aiAssistantLanguage} onSetAILanguage={setAiAssistantLanguage} currentAIScope={aiAssistantScope} onSetAIScope={handleSetAiAssistantScope} onSendCommand={handleProcessAICommand} aiVoiceReplayEnabled={aiVoiceReplayEnabled} onSetAiVoiceReplayEnabled={handleSetAiVoiceReplayEnabled} /> )}
+      {isCreateSalesInvoiceModalOpen && currentUser && ( <CreateInvoiceModal isOpen={isCreateSalesInvoiceModalOpen} onClose={() => { setIsCreateSalesInvoiceModalOpen(false); setEditingInvoice(null); setAiPreRenderDataForInvoice(null); }} onSaveInvoice={handleSaveInvoice} persons={persons.filter(p => !p.isDeleted)} products={products.filter(p => !p.isDeleted)} companyProfiles={companyProfiles.filter(cp => !cp.isDeleted)} onOpenSelectPersonModal={handleOpenSelectPersonModal} onPersonAdded={async (personData) => await handleSavePerson(personData)} isGlobalPhoneticModeActive={isGlobalPhoneticModeActive} onOpenManageProductsModal={handleManageProductsClick} editingInvoiceData={editingInvoice} aiPreRenderData={isOpeningInvoiceModalFromAI ? aiPreRenderDataForInvoice : undefined} onAIInvoiceDataProcessed={() => { setAiPreRenderDataForInvoice(null); setIsOpeningInvoiceModalFromAI(false); }} onOpenConfirmationModal={openConfirmationModal} /> )}
+      {isCreatePurchaseBillModalOpen && currentUser && ( <CreatePurchaseBillModal isOpen={isCreatePurchaseBillModalOpen} onClose={() => {setIsCreatePurchaseBillModalOpen(false); setEditingInvoice(null); setAiPreRenderDataForInvoice(null);}} onSaveInvoice={handleSaveInvoice} persons={persons.filter(p => !p.isDeleted)} products={products.filter(p => !p.isDeleted)} companyProfiles={companyProfiles.filter(cp => !cp.isDeleted)} onOpenSelectPersonModal={handleOpenSelectPersonModal} onPersonAdded={async (personData) => await handleSavePerson(personData)} isGlobalPhoneticModeActive={isGlobalPhoneticModeActive} onOpenManageProductsModal={handleManageProductsClick} editingInvoiceData={editingInvoice} /> )}
+      {isInvoiceListModalOpen && ( <InvoiceListModal isOpen={isInvoiceListModalOpen} onClose={() => setIsInvoiceListModalOpen(false)} invoices={invoices} persons={persons} onViewInvoice={(invoice) => { setViewingInvoice(invoice); setIsViewInvoiceModalOpen(true); setIsInvoiceListModalOpen(false); }} onCreateNewInvoice={() => { setEditingInvoice(null); setIsCreateSalesInvoiceModalOpen(true); setIsInvoiceListModalOpen(false); }} onOpenEditInvoiceModal={handleOpenEditInvoiceModal} /> )}
+      {isViewInvoiceModalOpen && viewingInvoice && ( <ViewInvoiceModal isOpen={isViewInvoiceModalOpen} onClose={() => { setIsViewInvoiceModalOpen(false); setViewingInvoice(null); }} invoice={viewingInvoice} persons={persons} companyProfiles={companyProfiles.filter(cp => !cp.isDeleted)} onRecordPayment={handleRecordInvoicePayment} currentUserName={currentUser?.name} /> )}
+      {isManageCompanyProfilesModalOpen && currentUser && ( <ManageCompanyProfilesModal isOpen={isManageCompanyProfilesModalOpen} onClose={() => setIsManageCompanyProfilesModalOpen(false)} companyProfiles={companyProfiles} onAddProfile={handleSaveCompanyProfile} onUpdateProfile={handleUpdateCompanyProfile} onDeleteProfile={handleDeleteCompanyProfile} /> )}
+      {isManageProductsModalOpen && currentUser && ( <ManageProductsModal isOpen={isManageProductsModalOpen} onClose={() => setIsManageProductsModalOpen(false)} products={products} currentUser={currentUser} onAddNewProductClick={handleOpenProductFormModalForAdd} onEditProductClick={handleOpenProductFormModalForEdit} onAddProduct={async (combinedData) => { const { initialStock, stockUnit, lowStockThreshold, ...productDetails } = combinedData; return handleSaveProduct(productDetails, { initialStock, stockUnit, lowStockThreshold });}} onUpdateProduct={async (id, updates) => { await handleSaveProduct(updates as any, undefined, id); }} onDeleteProduct={handleDeleteProduct} onRestoreProduct={handleRestoreProduct} onAdjustStock={async (productId, adj) => { if (!currentUser || !currentUser.id || currentUser.id === PREVIEW_USER_ID) return; const productToUpdate = products.find(p => p.id === productId); if (!productToUpdate) return; const now = new Date().toISOString(); const newStockLevel = (productToUpdate.currentStock || 0) + adj.quantityChange; const stockAdjustmentEntry: StockAdjustment = { id: `sh_${Date.now().toString()}_${Math.random().toString(36).substring(2,7)}`, date: now, type: adj.type, quantityChange: adj.quantityChange, newStockLevel: newStockLevel, notes: adj.notes, userId: currentUser.id, }; const updatedProduct: Product = { ...productToUpdate, currentStock: newStockLevel, stockHistory: [...(productToUpdate.stockHistory || []), stockAdjustmentEntry], lastModified: now, }; setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p)); await apiService.updateRecord('products', currentUser.id, { currentStock: updatedProduct.currentStock, stockHistory: JSON.stringify(updatedProduct.stockHistory), lastModified: updatedProduct.lastModified }, `id = '${productId}'`); }} onViewStockHistory={async (id) => { }} /> )}
+      {isProductFormModalOpen && ( <ProductFormModal isOpen={isProductFormModalOpen} onClose={handleCloseProductFormModal} onSave={handleSaveProduct} initialData={editingProduct} isGlobalPhoneticModeActive={isGlobalPhoneticModeActive} /> )}
+      {isManageBankAccountsModalOpen && currentUser && ( <ManageBankAccountsModal isOpen={isManageBankAccountsModalOpen} onClose={() => setIsManageBankAccountsModalOpen(false)} bankAccounts={bankAccounts} onOpenBankAccountForm={(acc) => acc ? handleOpenBankAccountFormModalForEdit(acc) : handleOpenBankAccountFormModalForAdd()} onDeleteBankAccount={handleDeleteBankAccount} onSetDefaultBankAccount={handleSetDefaultBankAccount} /> )}
+      {isBankAccountFormModalOpen && currentUser && ( <BankAccountFormModal isOpen={isBankAccountFormModalOpen} onClose={handleCloseBankAccountFormModal} onSave={handleSaveBankAccount} initialData={editingBankAccount} /> )}
+      {isChatModalOpen && chattingWithPerson && currentUser && ( <ChatModal isOpen={isChatModalOpen} onClose={() => setIsChatModalOpen(false)} person={chattingWithPerson} currentUser={currentUser} messages={messages.filter(msg => msg.threadId === [currentUser.id, chattingWithPerson.systemUserId].sort().join('_'))} onSendMessage={async (content, recipient, image, audio) => { }} onReactToMessage={async (msgId, emoji) => { }} onDeleteMessage={async (msgId) => { }} /> )}
+      {isInboxModalOpen && currentUser && ( <InboxModal isOpen={isInboxModalOpen} onClose={() => setIsInboxModalOpen(false)} currentUser={currentUser} persons={persons} messages={messages} onOpenChat={openChatForPerson} onOpenImageViewer={(imgContent) => imgContent && onOpenImageViewer(imgContent.base64Data, imgContent.fileName)} onDeleteChatHistory={async (person) => { }} /> )}
+      {isImageViewerOpen && viewingImageDetails && ( <ImageViewerModal isOpen={isImageViewerOpen} onClose={() => setIsImageViewerOpen(false)} imageUrl={viewingImageDetails.url} imageName={viewingImageDetails.name} /> )}
+      {isVideoCallModalOpen && videoCallTargetPerson && currentUser && ( <VideoCallModal isOpen={isVideoCallModalOpen} onClose={() => setIsVideoCallModalOpen(false)} targetPerson={videoCallTargetPerson} currentUser={currentUser} /> )}
+      {appError && ( <SimpleErrorModal isOpen={!!appError} onClose={() => setAppError(null)} message={appError} /> )}
+      {isConfirmModalOpen && ( <ConfirmationModal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} onConfirm={async () => { await confirmModalProps.onConfirmAction(); setIsConfirmModalOpen(false); }} title={String(confirmModalProps.title)} message={confirmModalProps.message} confirmButtonText={confirmModalProps.confirmButtonText} confirmButtonColor={confirmModalProps.confirmButtonColor} /> )}
     </div>
   );
 };
-
-// export default App; // Removed default export

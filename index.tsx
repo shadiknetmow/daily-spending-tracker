@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { App } from '@/App'; // Changed from './App' to '@/App' and default to named
+import { App } from './App';
 import { AuthProvider } from './contexts/AuthContext';
-import { NotificationProvider } from './contexts/NotificationContext'; // Import NotificationProvider
+import { NotificationProvider } from './contexts/NotificationContext'; // Ensured path is relative
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

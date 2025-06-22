@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, FormEvent, useCallback } from 'react';
-import { TransactionType, ExpenseFieldRequirements } from '../types';
+import { TransactionType, ExpenseFieldRequirements, BankAccount } from '../types';
 import { BN_UI_TEXT, COMMON_UNITS_BN, EXPENSE_TO_UNIT_MAP_BN } from '../constants';
 import ManageIcon from './icons/ManageIcon';
 import { useNotification } from '../contexts/NotificationContext';
@@ -8,13 +8,22 @@ import { convertToBanglaPhonetic } from '../utils/textUtils';
 
 interface SimplifiedTransactionFormProps {
   transactionType: TransactionType;
-  onAddTransaction: (transactionData: { description: string; amount: number; type: TransactionType; date: string }) => Promise<boolean>;
+  onAddTransaction: (transactionData: { 
+    description: string; 
+    amount: number; 
+    type: TransactionType; 
+    date: string;
+    bankAccountId?: string; // New
+    bankAccountName?: string; // New
+  }) => Promise<boolean>;
   suggestionsList: string[];
   onOpenManageSuggestions: () => void;
   formTitle: string;
   expenseFieldRequirements: ExpenseFieldRequirements;
   onUpdateExpenseFieldRequirements: (newRequirements: Partial<ExpenseFieldRequirements>) => void;
   isGlobalPhoneticModeActive: boolean;
+  bankAccounts: BankAccount[]; // New
+  defaultBankAccountId?: string | null; // New
 }
 
 export const SimplifiedTransactionForm: React.FC<SimplifiedTransactionFormProps> = ({
@@ -25,10 +34,13 @@ export const SimplifiedTransactionForm: React.FC<SimplifiedTransactionFormProps>
   expenseFieldRequirements,
   onUpdateExpenseFieldRequirements,
   isGlobalPhoneticModeActive,
+  bankAccounts, // New
+  defaultBankAccountId, // New
 }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 16));
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | undefined>(defaultBankAccountId || undefined); // New
 
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('');
@@ -51,15 +63,23 @@ export const SimplifiedTransactionForm: React.FC<SimplifiedTransactionFormProps>
     setUnit('');
     setAdditionalNotes('');
     // setTransactionDate(new Date().toISOString().slice(0, 16)); // Keep date or reset as needed
+    setSelectedBankAccountId(defaultBankAccountId || undefined); // Reset to default or undefined
     setCurrentFilteredSuggestions(suggestionsList);
     setShowSuggestionsDropdown(false);
-    // Focus description field after reset, useful for quick entry
     setTimeout(() => descriptionInputRef.current?.focus(), 0);
-  }, [suggestionsList]);
+  }, [suggestionsList, defaultBankAccountId]);
 
   useEffect(() => {
     resetFormForNewEntry();
   }, [transactionType, suggestionsList, resetFormForNewEntry]);
+
+  useEffect(() => {
+    // When defaultBankAccountId changes (e.g., user sets a new default elsewhere),
+    // update the selectedBankAccountId in this form *if* no account is currently selected for this entry.
+    if (!selectedBankAccountId && defaultBankAccountId) {
+      setSelectedBankAccountId(defaultBankAccountId);
+    }
+  }, [defaultBankAccountId, selectedBankAccountId]);
   
 
   useEffect(() => {
@@ -88,7 +108,7 @@ export const SimplifiedTransactionForm: React.FC<SimplifiedTransactionFormProps>
     filterSuggestions?: (value: string) => void
   ) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const rawInputValue: string = e.target.value;
-    if (skipPhoneticConversionOnceRef.current && setter === setDescription) { // Only skip for description for now
+    if (skipPhoneticConversionOnceRef.current) {
       setter(rawInputValue); 
       skipPhoneticConversionOnceRef.current = false;
     } else {
@@ -104,7 +124,7 @@ export const SimplifiedTransactionForm: React.FC<SimplifiedTransactionFormProps>
     setter: React.Dispatch<React.SetStateAction<string>>,
     inputRefToUpdate?: React.RefObject<HTMLInputElement | HTMLTextAreaElement>
   ) => (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (skipPhoneticConversionOnceRef.current && setter === setDescription) return;
+    if (skipPhoneticConversionOnceRef.current) return;
 
     if (isGlobalPhoneticModeActive && e.key === ' ') {
       e.preventDefault();
@@ -152,7 +172,7 @@ export const SimplifiedTransactionForm: React.FC<SimplifiedTransactionFormProps>
     setter: React.Dispatch<React.SetStateAction<string>>,
     inputRefToUpdate?: React.RefObject<HTMLInputElement | HTMLTextAreaElement>
   ) => (e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (skipPhoneticConversionOnceRef.current && setter === setDescription) {
+    if (skipPhoneticConversionOnceRef.current) {
         skipPhoneticConversionOnceRef.current = false;
         return;
     }
@@ -269,8 +289,8 @@ export const SimplifiedTransactionForm: React.FC<SimplifiedTransactionFormProps>
         const notesTrimmed = additionalNotes.trim();
         
         const detailParts: string[] = [];
-        if (qtyTrimmed || unitTrimmed) { // Only add Qty/Unit part if at least one is present
-            let qtyUnitString = qtyTrimmed || ""; // Default to empty if no quantity
+        if (qtyTrimmed || unitTrimmed) { 
+            let qtyUnitString = qtyTrimmed || ""; 
             if (unitTrimmed) {
                 qtyUnitString = qtyTrimmed ? `${qtyTrimmed} ${unitTrimmed}` : unitTrimmed;
             }
@@ -285,11 +305,15 @@ export const SimplifiedTransactionForm: React.FC<SimplifiedTransactionFormProps>
         }
     }
     
+    const selectedAccount = bankAccounts.find(acc => acc.id === selectedBankAccountId);
+
     const success = await onAddTransaction({
       description: finalDescription,
       amount: numAmount,
       type: transactionType,
       date: new Date(transactionDate).toISOString(),
+      bankAccountId: selectedBankAccountId || undefined,
+      bankAccountName: selectedAccount?.accountName || undefined,
     });
 
     if (success) {
@@ -487,6 +511,26 @@ export const SimplifiedTransactionForm: React.FC<SimplifiedTransactionFormProps>
           />
         </div>
       </div>
+      
+      <div>
+        <label htmlFor="s-bank-account" className="block text-sm font-medium text-slate-600 mb-1">
+          {BN_UI_TEXT.SELECT_BANK_ACCOUNT_TRANSACTION_LABEL}
+        </label>
+        <select
+          id="s-bank-account"
+          value={selectedBankAccountId || ''}
+          onChange={(e) => setSelectedBankAccountId(e.target.value || undefined)}
+          className="w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 bg-white"
+        >
+          <option value="">{BN_UI_TEXT.SELECT_BANK_ACCOUNT_PLACEHOLDER}</option>
+          {bankAccounts.filter(acc => !acc.isDeleted).map(acc => (
+            <option key={acc.id} value={acc.id}>
+              {acc.accountName} {acc.bankName && `(${acc.bankName})`}
+            </option>
+          ))}
+        </select>
+      </div>
+
 
       <button
         type="submit"

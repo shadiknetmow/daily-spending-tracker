@@ -10,7 +10,7 @@ interface ArchiveModalProps {
   isOpen: boolean;
   onClose: () => void;
   allTransactions: Transaction[];
-  allPersons: Person[];
+  persons: Person[]; // Changed from allPersons
   onRestoreTransaction: (id: string) => void;
   onRestorePerson: (personId: string) => void;
   onViewTransactionHistory: (transaction: Transaction) => void;
@@ -22,14 +22,14 @@ interface ArchiveModalProps {
   onDeleteTransaction: (id: string) => void;
   onEditTransaction: (transaction: Transaction) => void;
   onOpenChat: (person: Person) => void; 
-  onOpenVideoCall: (person: Person) => void; // New prop
+  onOpenVideoCall: (person: Person) => void; 
 }
 
 const ArchiveModal: React.FC<ArchiveModalProps> = ({
   isOpen,
   onClose,
   allTransactions,
-  allPersons,
+  persons, // Changed from allPersons
   onRestoreTransaction,
   onRestorePerson,
   onViewTransactionHistory,
@@ -41,7 +41,7 @@ const ArchiveModal: React.FC<ArchiveModalProps> = ({
   onDeleteTransaction, 
   onEditTransaction,
   onOpenChat, 
-  onOpenVideoCall, // Destructure new prop
+  onOpenVideoCall, 
 }) => {
   const [activeTab, setActiveTab] = useState<'transactions' | 'persons'>('transactions');
 
@@ -50,8 +50,8 @@ const ArchiveModal: React.FC<ArchiveModalProps> = ({
   }, [allTransactions]);
 
   const deletedPersons = useMemo(() => {
-    return allPersons.filter(p => p.isDeleted);
-  }, [allPersons]);
+    return persons.filter(p => p.isDeleted); // Changed from allPersons to persons
+  }, [persons]);
 
   return (
     <Modal
@@ -110,7 +110,7 @@ const ArchiveModal: React.FC<ArchiveModalProps> = ({
               getPersonNetLedgerBalance={getPersonNetLedgerBalance} 
               onRestorePerson={onRestorePerson}
               onOpenChat={onOpenChat}
-              onOpenVideoCall={onOpenVideoCall} // Pass handler
+              onOpenVideoCall={onOpenVideoCall} 
             />
           )}
         </div>

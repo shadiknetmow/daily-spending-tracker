@@ -11,7 +11,7 @@ export const sendWelcomeEmail = async (to_email: string, to_name: string): Promi
       <body style="font-family: Arial, sans-serif; line-height: 1.6;">
         <p>প্রিয় ${to_name},</p>
         <p>আমাদের '${appTitle}' অ্যাপ্লিকেশনে আপনাকে স্বাগতম!</p>
-        <p>আপনার দৈনন্দিন আয় এবং ব্যয়ের হিসাব সহজে ট্র্যাক করতে এই অ্যাপ্লিকেশনটি ব্যবহার করুন। AI দ্বারা চালিত আর্থিক পরামর্শও এখানে পাবেন।</p>
+        <p>আপনার দৈনন্দিন আয় এবং ব্যয়ের হিসাব সহজে ট্র্যাক করতে এই অ্যাপ্লিকেশনটি ব্যবহার করুন। Gemini AI দ্বারা চালিত আর্থিক পরামর্শও এখানে পাবেন।</p>
         <p>ধন্যবাদ!</p>
         <p>শুভেচ্ছান্তে,<br/><strong>${appTitle} টিম</strong></p>
       </body>

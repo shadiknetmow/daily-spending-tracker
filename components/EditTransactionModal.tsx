@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, FormEvent, useRef } from 'react';
-import { Transaction, TransactionType } from '../types';
+import { Transaction, TransactionType, BankAccount } from '../types'; // Added BankAccount
 import { BN_UI_TEXT } from '../constants';
 import ManageIcon from './icons/ManageIcon'; 
 import { useNotification } from '../contexts/NotificationContext';
@@ -14,6 +14,7 @@ interface EditTransactionModalProps {
   allSuggestions: string[]; 
   onOpenManageSuggestions: () => void; 
   isGlobalPhoneticModeActive: boolean; 
+  bankAccounts: BankAccount[]; // New
 }
 
 const EditTransactionModal: React.FC<EditTransactionModalProps> = ({ 
@@ -24,11 +25,13 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   allSuggestions,
   onOpenManageSuggestions,
   isGlobalPhoneticModeActive, 
+  bankAccounts, // New
 }) => {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<TransactionType>(TransactionType.EXPENSE);
   const [date, setDate] = useState(''); 
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | undefined>(undefined); // New
 
   const [currentFilteredSuggestions, setCurrentFilteredSuggestions] = useState<string[]>(allSuggestions);
   const [showSuggestionsDropdown, setShowSuggestionsDropdown] = useState(false);
@@ -45,19 +48,19 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
       setAmount(transaction.amount.toString());
       setType(transaction.type);
       setDate(new Date(transaction.date).toISOString().slice(0, 16));
-      // Initial suggestions can be based on the full description if needed
+      setSelectedBankAccountId(transaction.bankAccountId || undefined); // New
       setCurrentFilteredSuggestions(allSuggestions.filter(s => s.toLowerCase().includes(transaction.description.toLowerCase())));
     }
   }, [transaction, allSuggestions, isOpen]);
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawInputValue = e.target.value;
+    const rawInputValue: string = e.target.value;
 
     if (skipPhoneticConversionOnceRef.current) {
       setDescription(rawInputValue);
       skipPhoneticConversionOnceRef.current = false;
     } else {
-      setDescription(rawInputValue); // Store raw input, conversion handled by onKeyDown/onPaste
+      setDescription(rawInputValue); 
     }
 
     if (rawInputValue.trim()) {
@@ -118,7 +121,7 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
 
   const handleDescriptionPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     if (skipPhoneticConversionOnceRef.current) {
-        skipPhoneticConversionOnceRef.current = false; // Consume the flag if paste happens right after a skip-worthy set
+        skipPhoneticConversionOnceRef.current = false; 
         return;
     }
     if (isGlobalPhoneticModeActive) {
@@ -191,6 +194,8 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
       return;
     }
     
+    const selectedAccount = bankAccounts.find(acc => acc.id === selectedBankAccountId);
+
     const updatedTransactionData: Transaction = {
       ...transaction,
       description: description.trim(), 
@@ -199,6 +204,8 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
       date: new Date(date).toISOString(), 
       lastModified: new Date().toISOString(),
       originalDate: transaction.originalDate || transaction.date, 
+      bankAccountId: selectedBankAccountId || undefined, // New
+      bankAccountName: selectedAccount?.accountName || undefined, // New
     };
     onSave(updatedTransactionData);
     setShowSuggestionsDropdown(false);
@@ -304,6 +311,24 @@ const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
               className="w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500"
               required
             />
+          </div>
+          <div>
+            <label htmlFor="edit-bank-account" className="block text-sm font-medium text-slate-600 mb-1">
+              {BN_UI_TEXT.SELECT_BANK_ACCOUNT_TRANSACTION_LABEL}
+            </label>
+            <select
+              id="edit-bank-account"
+              value={selectedBankAccountId || ''}
+              onChange={(e) => setSelectedBankAccountId(e.target.value || undefined)}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg shadow-sm focus:ring-teal-500 focus:border-teal-500 bg-white"
+            >
+              <option value="">{BN_UI_TEXT.SELECT_BANK_ACCOUNT_PLACEHOLDER}</option>
+              {bankAccounts.filter(acc => !acc.isDeleted).map(acc => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.accountName} {acc.bankName && `(${acc.bankName})`}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <span className="block text-sm font-medium text-slate-600 mb-2">{BN_UI_TEXT.TRANSACTION_TYPE}</span>

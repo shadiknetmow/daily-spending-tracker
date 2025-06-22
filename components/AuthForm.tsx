@@ -1,10 +1,11 @@
 
+
 import React, { useState, FormEvent, useEffect, useRef } from 'react';
-import { BN_UI_TEXT } from '../constants';
+import { BN_UI_TEXT, LOCAL_STORAGE_KEYS } from '../constants'; // Updated path
 import { useAuth } from '../contexts/AuthContext';
-import { AuthFormMode } from '../types'; 
+import { AuthFormMode } from '../types'; // Updated path
 import ExclamationCircleIcon from './icons/ExclamationCircleIcon';
-import { useNotification } from '../contexts/NotificationContext'; 
+import { useNotification } from "../contexts/NotificationContext";
 
 interface AuthFormProps {
   mode: AuthFormMode; 
@@ -17,7 +18,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, initialEmail, onClose, onSwit
   const [emailOrMobile, setEmailOrMobile] = useState(mode === 'forgotPasswordReset' && initialEmail ? initialEmail : '');
   const [password, setPassword] = useState('');
   const [name, setName] = useState(''); 
-  const [rememberMe, setRememberMe] = useState(false);
+  // Removed rememberMe state: const [rememberMe, setRememberMe] = useState(false);
   
   const [resetCodeInput, setResetCodeInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -44,18 +45,26 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, initialEmail, onClose, onSwit
 
 
   useEffect(() => {
+    // Simplified useEffect: No longer pre-fills email/password or sets rememberMe state for login mode.
     if (mode === 'forgotPasswordReset' && initialEmail) {
         if (emailOrMobile !== initialEmail) setEmailOrMobile(initialEmail);
-    } else if ((mode === 'login' || mode === 'signup') && (prevModeRef.current === 'forgotPasswordRequest' || prevModeRef.current === 'forgotPasswordReset')) {
+        setPassword(''); 
+    } else if (mode !== 'login') { // For signup, forgotPasswordRequest
         setEmailOrMobile('');
+        setPassword('');
+    } else { // For login mode, ensure fields are clear unless an initialEmail is specifically passed (e.g., from password reset flow)
+        if (initialEmail && emailOrMobile !== initialEmail) {
+             setEmailOrMobile(initialEmail);
+        } else if (!initialEmail) {
+            setEmailOrMobile('');
+        }
+        setPassword('');
     }
     
     if (mode !== 'signup') {
         if (name !== '') setName('');
     }
-    if (mode !== 'login' && mode !== 'forgotPasswordReset') {
-        if (password !== '') setPassword('');
-    }
+
     if (mode !== 'forgotPasswordReset') {
       if (resetCodeInput !== '') setResetCodeInput('');
       if (newPassword !== '') setNewPassword('');
@@ -76,7 +85,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, initialEmail, onClose, onSwit
 
     prevModeRef.current = mode;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, initialEmail, clearAuthError, authError]);
+  }, [mode, initialEmail, clearAuthError]); 
 
 
   const handleSubmit = async (e: FormEvent) => {
@@ -86,13 +95,16 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, initialEmail, onClose, onSwit
     setNewPasswordError(null);
     setConfirmPasswordError(null);
     let isValid = true;
+    let authSuccessful = false;
 
     if (mode === 'login') {
       if (password.length < 6) {
         setPasswordError(BN_UI_TEXT.PASSWORD_PLACEHOLDER); 
         isValid = false;
       }
-      if (isValid) await login(emailOrMobile, password, rememberMe); 
+      if (isValid) {
+        authSuccessful = await login(emailOrMobile, password, false); // Pass false for rememberMe
+      }
     } else if (mode === 'signup') {
       if (!name.trim()) {
         setFormMessage(BN_UI_TEXT.NAME + " প্রয়োজন।"); 
@@ -102,7 +114,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, initialEmail, onClose, onSwit
         setPasswordError(BN_UI_TEXT.PASSWORD_PLACEHOLDER); 
         isValid = false;
       }
-      if (isValid) await signup(name, emailOrMobile, password);
+      if (isValid) {
+        authSuccessful = await signup(name, emailOrMobile, password);
+      }
     } else if (mode === 'forgotPasswordRequest') {
       const currentEmailVal = emailOrMobileInputRef.current?.value || emailOrMobile; 
       if (!currentEmailVal) {
@@ -143,15 +157,25 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, initialEmail, onClose, onSwit
       
       try {
         await resetPasswordWithCode(emailOrMobile, resetCodeInput, newPassword);
+        authSuccessful = true; 
         setResetCodeInput('');
         setNewPassword('');
         setConfirmNewPassword('');
         setPassword(''); 
       } catch (err:any) {
-        if (!authError) { 
-             setFormMessage(err.message || BN_UI_TEXT.AUTH_ERROR_GENERAL);
+        if (!authError && err.message) { 
+             setFormMessage(err.message);
+        } else if (!authError) {
+             setFormMessage(BN_UI_TEXT.AUTH_ERROR_GENERAL);
         }
       }
+    }
+
+    if ((mode === 'login' || mode === 'signup' || mode === 'forgotPasswordReset') && authSuccessful) {
+      if (mode === 'login') { // Password field is always cleared after login attempt now
+          setPassword('');
+      }
+      onClose();
     }
   };
   
@@ -245,21 +269,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, initialEmail, onClose, onSwit
             </div>
           )}
 
-          {mode === 'login' && (
-            <div className="mt-2 mb-1"> 
-              <label htmlFor="rememberMe" className="flex items-center text-sm text-slate-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  id="rememberMe"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="form-checkbox h-4 w-4 text-teal-600 border-slate-300 rounded focus:ring-teal-500 mr-2"
-                />
-                {BN_UI_TEXT.REMEMBER_ME}
-              </label>
-            </div>
-          )}
-
+          {/* Removed "Remember Me" checkbox */}
 
           {mode === 'forgotPasswordReset' && (
             <>
@@ -278,12 +288,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, initialEmail, onClose, onSwit
                 />
               </div>
               <div>
-                <label htmlFor="newPassword" className="block text-sm font-medium text-slate-600 mb-1">
+                <label htmlFor="newPasswordModal" className="block text-sm font-medium text-slate-600 mb-1">
                   {BN_UI_TEXT.NEW_PASSWORD_LABEL}
                 </label>
                 <input
                   type="password"
-                  id="newPassword"
+                  id="newPasswordModal"
                   value={newPassword}
                   onChange={(e) => { setNewPassword(e.target.value); setNewPasswordError(null); if(confirmPasswordError === BN_UI_TEXT.PASSWORDS_DONT_MATCH) setConfirmPasswordError(null); }}
                   placeholder={BN_UI_TEXT.PASSWORD_PLACEHOLDER}
@@ -295,12 +305,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ mode, initialEmail, onClose, onSwit
                 {newPasswordError && <p id="new-password-error" className="mt-1 text-xs text-red-600">{newPasswordError}</p>}
               </div>
               <div>
-                <label htmlFor="confirmNewPassword" className="block text-sm font-medium text-slate-600 mb-1">
+                <label htmlFor="confirmNewPasswordModal" className="block text-sm font-medium text-slate-600 mb-1">
                   {BN_UI_TEXT.CONFIRM_NEW_PASSWORD_LABEL}
                 </label>
                 <input
                   type="password"
-                  id="confirmNewPassword"
+                  id="confirmNewPasswordModal"
                   value={confirmNewPassword}
                   onChange={(e) => { setConfirmNewPassword(e.target.value); setConfirmPasswordError(null); if(newPasswordError === BN_UI_TEXT.PASSWORDS_DONT_MATCH) setNewPasswordError(null); }}
                   placeholder={BN_UI_TEXT.PASSWORD_PLACEHOLDER}

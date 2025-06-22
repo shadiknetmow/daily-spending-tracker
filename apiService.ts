@@ -1,8 +1,8 @@
 
-import { User } from './types';
+import { User, UserSuggestion, Invoice, InvoiceType, InvoicePaymentMethod, BankAccount } from '../types'; // Added BankAccount
 import bcrypt from 'bcryptjs'; // Import bcrypt
 
-const API_BASE_URL = 'https://live.medha4u.com/';
+const API_BASE_URL = 'https://api.medha4u.com/';
 const ACCESS_TOKEN = 'DzhIpz0ALDkOKCx6Bqvg4RYNgrwQWpyk';
 
 interface ColumnDefinition {
@@ -80,7 +80,47 @@ export const schemas: Record<string, ColumnDefinition[]> = {
     { name: 'hashed_password', type: 'VARCHAR(255)', options: 'NOT NULL' },
     { name: 'created_at', type: 'TIMESTAMP', options: 'DEFAULT CURRENT_TIMESTAMP' },
     { name: 'reset_code', type: 'TEXT', options: 'NULL DEFAULT NULL' },
-    { name: 'reset_token_expiry', type: 'TEXT', options: 'NULL DEFAULT NULL' }
+    { name: 'reset_token_expiry', type: 'TEXT', options: 'NULL DEFAULT NULL' },
+    // Admin App Settings
+    { name: 'enableSchemaCheckOnStartup', type: 'INTEGER', options: 'DEFAULT 1' },
+    { name: 'enableDataFetchOnStartup', type: 'INTEGER', options: 'DEFAULT 1' },
+    // Sales Invoice Defaults
+    { name: 'defaultSalesPaymentStatus', type: 'TEXT', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultSalesInvoiceDateOffset', type: 'INTEGER', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultSalesDueDateOffset', type: 'INTEGER', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultSalesCompanyProfileId', type: 'VARCHAR(255)', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultSalesDiscountType', type: 'TEXT', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultSalesDiscountValue', type: 'REAL', options: 'NULL DEFAULT NULL' }, 
+    { name: 'defaultSalesTaxType', type: 'TEXT', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultSalesTaxValue', type: 'REAL', options: 'NULL DEFAULT NULL' }, 
+    { name: 'defaultSalesPaymentMethod', type: 'TEXT', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultSalesPaymentNotes', type: 'TEXT', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultSalesInvoiceNotes', type: 'TEXT', options: 'NULL DEFAULT NULL' },
+    // Purchase Bill Defaults
+    { name: 'defaultPurchaseBillDateOffset', type: 'INTEGER', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultPurchaseDueDateOffset', type: 'INTEGER', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultPurchaseCompanyProfileId', type: 'VARCHAR(255)', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultPurchaseDiscountType', type: 'TEXT', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultPurchaseDiscountValue', type: 'REAL', options: 'NULL DEFAULT NULL' }, 
+    { name: 'defaultPurchaseTaxType', type: 'TEXT', options: 'NULL DEFAULT NULL' },
+    { name: 'defaultPurchaseTaxValue', type: 'REAL', options: 'NULL DEFAULT NULL' }, 
+    // Bank Account Default
+    { name: 'defaultBankAccountId', type: 'VARCHAR(255)', options: 'NULL DEFAULT NULL' },
+  ],
+  company_profiles: [ 
+    { name: 'id', type: 'VARCHAR(255)', options: 'PRIMARY KEY' },
+    { name: 'user_id', type: 'VARCHAR(255)', options: 'NOT NULL' },
+    { name: 'companyName', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'address', type: 'TEXT', options: 'NULL' },
+    { name: 'phone', type: 'TEXT', options: 'NULL' },
+    { name: 'email', type: 'TEXT', options: 'NULL' },
+    { name: 'logoBase64', type: 'MEDIUMTEXT', options: 'NULL' },
+    { name: 'taxId', type: 'TEXT', options: 'NULL' },
+    { name: 'isDefault', type: 'INTEGER', options: 'DEFAULT 0' },
+    { name: 'createdAt', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'lastModified', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'isDeleted', type: 'INTEGER', options: 'DEFAULT 0' },
+    { name: 'deletedAt', type: 'TEXT', options: 'NULL' },
   ],
   transactions: [
     { name: 'id', type: 'VARCHAR(255)', options: 'PRIMARY KEY' },
@@ -93,6 +133,8 @@ export const schemas: Record<string, ColumnDefinition[]> = {
     { name: 'lastModified', type: 'TEXT' },
     { name: 'editHistory', type: 'MEDIUMTEXT' }, 
     { name: 'linkedLedgerEntryId', type: 'TEXT' },
+    { name: 'bankAccountId', type: 'TEXT', options: 'NULL' }, 
+    { name: 'bankAccountName', type: 'TEXT', options: 'NULL' }, 
     { name: 'isDeleted', type: 'INTEGER', options: 'DEFAULT 0' },
     { name: 'deletedAt', type: 'TEXT', options: 'NULL' },
   ],
@@ -141,8 +183,8 @@ export const schemas: Record<string, ColumnDefinition[]> = {
   user_transaction_suggestions: [
     { name: 'id', type: 'VARCHAR(255)', options: 'PRIMARY KEY' },
     { name: 'user_id', type: 'VARCHAR(255)', options: 'NOT NULL' },
-    { name: 'text', type: 'TEXT', options: 'NOT NULL' }, // Renamed from 'suggestion'
-    { name: 'type', type: 'TEXT', options: 'NOT NULL' }, // Added 'type' column (income/expense)
+    { name: 'text', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'type', type: 'TEXT', options: 'NOT NULL' },
   ],
   budgetCategories: [
     { name: 'id', type: 'VARCHAR(255)', options: 'PRIMARY KEY' },
@@ -165,7 +207,7 @@ export const schemas: Record<string, ColumnDefinition[]> = {
   ],
   messages: [
     { name: 'id', type: 'VARCHAR(255)', options: 'PRIMARY KEY' },
-    { name: 'user_id', type: 'VARCHAR(255)', options: 'NOT NULL' }, // Owner of this record
+    { name: 'user_id', type: 'VARCHAR(255)', options: 'NOT NULL' }, 
     { name: 'threadId', type: 'VARCHAR(255)', options: 'NOT NULL' },
     { name: 'actualSenderId', type: 'VARCHAR(255)', options: 'NOT NULL' },
     { name: 'actualReceiverId', type: 'VARCHAR(255)', options: 'NOT NULL' },
@@ -175,9 +217,75 @@ export const schemas: Record<string, ColumnDefinition[]> = {
     { name: 'timestamp', type: 'TEXT', options: 'NOT NULL' }, 
     { name: 'isRead', type: 'INTEGER', options: 'NOT NULL DEFAULT 0' }, 
     { name: 'reactions', type: 'TEXT', options: 'NULL' },
-    { name: 'isDeleted', type: 'INTEGER', options: 'DEFAULT 0' }, // New field
-    { name: 'deletedAt', type: 'TEXT', options: 'NULL' },       // New field
-    { name: 'editHistory', type: 'MEDIUMTEXT', options: 'NULL' }, // New field
+    { name: 'isDeleted', type: 'INTEGER', options: 'DEFAULT 0' }, 
+    { name: 'deletedAt', type: 'TEXT', options: 'NULL' },       
+    { name: 'editHistory', type: 'MEDIUMTEXT', options: 'NULL' }, 
+  ],
+  invoices: [ 
+    { name: 'id', type: 'VARCHAR(255)', options: 'PRIMARY KEY' },
+    { name: 'user_id', type: 'VARCHAR(255)', options: 'NOT NULL' },
+    { name: 'invoiceNumber', type: 'VARCHAR(255)', options: 'NOT NULL' }, 
+    { name: 'invoiceType', type: 'TEXT', options: "NOT NULL" }, 
+    { name: 'invoiceDate', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'dueDate', type: 'TEXT' },
+    { name: 'personId', type: 'VARCHAR(255)', options: 'NOT NULL' },
+    { name: 'companyProfileId', type: 'VARCHAR(255)', options: 'NULL' },
+    { name: 'items', type: 'MEDIUMTEXT', options: 'NOT NULL' }, 
+    { name: 'subtotal', type: 'REAL', options: 'NOT NULL' },
+    { name: 'discountType', type: 'TEXT' },
+    { name: 'discountValue', type: 'REAL' },
+    { name: 'discountAmount', type: 'REAL' },
+    { name: 'taxType', type: 'TEXT' },
+    { name: 'taxValue', type: 'REAL' },
+    { name: 'taxAmount', type: 'REAL' },
+    { name: 'totalAmount', type: 'REAL', options: 'NOT NULL' },
+    { name: 'notes', type: 'TEXT' },
+    { name: 'paymentStatus', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'paymentsReceived', type: 'MEDIUMTEXT', options: 'NULL' },
+    { name: 'createdAt', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'lastModified', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'editHistory', type: 'MEDIUMTEXT' }, 
+    { name: 'isDeleted', type: 'INTEGER', options: 'DEFAULT 0' },
+    { name: 'deletedAt', type: 'TEXT' },
+  ],
+  products: [ 
+    { name: 'id', type: 'VARCHAR(255)', options: 'PRIMARY KEY' },
+    { name: 'user_id', type: 'VARCHAR(255)', options: 'NOT NULL' },
+    { name: 'name', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'description', type: 'TEXT', options: 'NULL' },
+    { name: 'unitPrice', type: 'REAL', options: 'NULL' }, // Sales Price
+    { name: 'unit', type: 'TEXT', options: 'NULL' },
+    { name: 'productImage', type: 'MEDIUMTEXT', options: 'NULL' },
+    { name: 'mrp', type: 'REAL', options: 'NULL' },
+    { name: 'wholesalePrice', type: 'REAL', options: 'NULL' },
+    { name: 'createdAt', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'lastModified', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'isDeleted', type: 'INTEGER', options: 'DEFAULT 0' },
+    { name: 'deletedAt', type: 'TEXT', options: 'NULL' },
+    // Inventory Management Fields
+    { name: 'currentStock', type: 'REAL', options: 'DEFAULT 0' },
+    { name: 'stockUnit', type: 'TEXT', options: 'NULL' },
+    { name: 'lowStockThreshold', type: 'REAL', options: 'DEFAULT 0' },
+    { name: 'stockHistory', type: 'MEDIUMTEXT', options: 'NULL'}
+  ],
+  bank_accounts: [ 
+    { name: 'id', type: 'VARCHAR(255)', options: 'PRIMARY KEY' },
+    { name: 'user_id', type: 'VARCHAR(255)', options: 'NOT NULL' },
+    { name: 'accountName', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'accountNumber', type: 'TEXT', options: 'NULL' },
+    { name: 'bankName', type: 'TEXT', options: 'NULL' },
+    { name: 'branchName', type: 'TEXT', options: 'NULL' },
+    { name: 'accountType', type: 'TEXT', options: 'NOT NULL' }, 
+    { name: 'initialBalance', type: 'REAL', options: 'NOT NULL DEFAULT 0' },
+    { name: 'balanceEffectiveDate', type: 'TEXT', options: 'NOT NULL' }, 
+    { name: 'currency', type: 'TEXT', options: "NOT NULL" }, // Removed DEFAULT 'BDT'
+    { name: 'notes', type: 'TEXT', options: 'NULL' },
+    { name: 'isDefault', type: 'INTEGER', options: 'DEFAULT 0' },
+    { name: 'createdAt', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'lastModified', type: 'TEXT', options: 'NOT NULL' },
+    { name: 'isDeleted', type: 'INTEGER', options: 'DEFAULT 0' },
+    { name: 'deletedAt', type: 'TEXT', options: 'NULL' },
+    { name: 'editHistory', type: 'MEDIUMTEXT', options: 'NULL' },
   ],
 };
 
@@ -198,29 +306,64 @@ function prepareDataForStorage(data: Record<string, any>): Record<string, any> {
   if (processedData.hasOwnProperty('userId')) { 
     delete processedData.userId;
   }
-  // Consolidate JSON stringification
-  const fieldsToStringify = ['editHistory', 'associatedSuggestions', 'imageContent', 'audioContent', 'reactions'];
+  
+  const fieldsToStringify = ['editHistory', 'associatedSuggestions', 'imageContent', 'audioContent', 'reactions', 'items', 'paymentsReceived', 'logoBase64', 'stockHistory', 'productImage']; 
   fieldsToStringify.forEach(fieldKey => {
     if (processedData[fieldKey] && (Array.isArray(processedData[fieldKey]) || typeof processedData[fieldKey] === 'object')) {
       processedData[fieldKey] = JSON.stringify(processedData[fieldKey]);
+    } else if (processedData[fieldKey] === undefined && (fieldKey === 'items' || fieldKey === 'paymentsReceived' || fieldKey === 'editHistory' || fieldKey === 'associatedSuggestions' || fieldKey === 'stockHistory')) {
+      processedData[fieldKey] = JSON.stringify([]); 
     }
   });
 
-  // Consolidate boolean to int conversion
-  const booleanFieldsToConvert: (keyof typeof processedData)[] = ['isSettled', 'isDeleted', 'isRead'];
+  const booleanFieldsToConvert: (keyof typeof processedData)[] = [
+      'isSettled', 'isDeleted', 'isRead', 'isDefault', 
+      'enableSchemaCheckOnStartup', 'enableDataFetchOnStartup'
+    ];
   booleanFieldsToConvert.forEach(fieldKey => {
     if (typeof processedData[fieldKey] === 'boolean') {
       processedData[fieldKey] = processedData[fieldKey] ? 1 : 0;
+    } else if (processedData[fieldKey] === undefined && (fieldKey === 'enableSchemaCheckOnStartup' || fieldKey === 'enableDataFetchOnStartup')) {
+        processedData[fieldKey] = 1; 
     }
   });
   
-  const nullableFields: (keyof typeof processedData)[] = ['customAlias', 'systemUserId', 'profileImage', 'email', 'facebookProfileUrl', 'deletedAt', 'linkedLedgerEntryId', 'originalDate', 'dueDate', 'settledDate', 'reset_code', 'reset_token_expiry', 'imageContent', 'audioContent', 'reactions', 'editHistory'];
+  const nullableFields: (keyof typeof processedData)[] = [
+    'customAlias', 'systemUserId', 'profileImage', 'productImage', 'email', 'facebookProfileUrl', 
+    'deletedAt', 'linkedLedgerEntryId', 'originalDate', 'dueDate', 'settledDate', 
+    'reset_code', 'reset_token_expiry', 
+    'defaultSalesPaymentStatus', 'defaultSalesInvoiceDateOffset', 'defaultSalesDueDateOffset', 'defaultSalesCompanyProfileId', 
+    'defaultSalesDiscountType', 'defaultSalesDiscountValue', 'defaultSalesTaxType', 'defaultSalesTaxValue',
+    'defaultSalesPaymentMethod', 'defaultSalesPaymentNotes', 'defaultSalesInvoiceNotes', 
+    'defaultPurchaseBillDateOffset', 'defaultPurchaseDueDateOffset', 'defaultPurchaseCompanyProfileId', 
+    'defaultPurchaseDiscountType', 'defaultPurchaseDiscountValue', 'defaultPurchaseTaxType', 'defaultPurchaseTaxValue',
+    'defaultBankAccountId', 
+    'imageContent', 'audioContent', 'reactions', 'editHistory', 
+    'discountType', 'discountValue', 'discountAmount', 'taxType', 'taxValue', 'taxAmount', 'notes', 'paymentsReceived', 
+    'description', 'unitPrice', 'unit', 'address', 'phone', 'logoBase64', 'taxId', 'companyProfileId', 
+    'stockUnit', 'lowStockThreshold', 'stockHistory', 'mrp', 'wholesalePrice',
+    'accountNumber', 'bankName', 'branchName', 'bankAccountId', 'bankAccountName' 
+  ]; 
   nullableFields.forEach(field => {
     if (processedData.hasOwnProperty(field) && processedData[field] === undefined) {
-      processedData[field] = null;
+        if (field === 'paymentsReceived' || field === 'items' || field === 'editHistory' || field === 'associatedSuggestions' || field === 'stockHistory') {
+             processedData[field] = JSON.stringify([]);
+        } else if (typeof field === 'string' && (String(field).endsWith('Value') || String(field).endsWith('Offset') || field === 'defaultSalesPaymentMethod' || field === 'defaultSalesPaymentNotes' || field === 'defaultSalesInvoiceNotes') && processedData[field] === undefined) { 
+            processedData[field] = null; 
+        } else {
+            processedData[field] = null;
+        }
     }
   });
   
+  const numericFieldsDefaultZero: (keyof typeof processedData)[] = ['currentStock', 'lowStockThreshold', 'initialBalance'];
+  numericFieldsDefaultZero.forEach(field => {
+    if (processedData[field] === undefined) {
+        processedData[field] = 0;
+    }
+  });
+
+
   return processedData;
 }
 
@@ -232,56 +375,128 @@ function parseDataFromStorage<T>(item: Record<string, any>): T {
         delete parsedItem.user_id;
     }
 
-    const fieldsToParseAsJson = ['editHistory', 'associatedSuggestions', 'imageContent', 'audioContent', 'reactions']; 
+    const fieldsToParseAsJson = ['editHistory', 'associatedSuggestions', 'imageContent', 'audioContent', 'reactions', 'items', 'paymentsReceived', 'logoBase64', 'stockHistory', 'productImage']; 
     fieldsToParseAsJson.forEach(fieldKey => {
         if (parsedItem[fieldKey] && typeof parsedItem[fieldKey] === 'string') {
             try {
                 parsedItem[fieldKey] = JSON.parse(parsedItem[fieldKey]);
             } catch (e: any) {
                 console.error(`Failed to parse ${fieldKey} for item:`, item, e.message);
-                 if (fieldKey === 'imageContent' || fieldKey === 'reactions' || fieldKey === 'audioContent' || fieldKey === 'editHistory') { // editHistory can be null
-                    parsedItem[fieldKey] = fieldKey === 'editHistory' ? [] : undefined;
-                 } else {
+                 if (fieldKey === 'imageContent' || fieldKey === 'reactions' || fieldKey === 'audioContent' || fieldKey === 'logoBase64' || fieldKey === 'productImage') { 
+                    parsedItem[fieldKey] = undefined;
+                 } else { 
                     parsedItem[fieldKey] = []; 
                  }
             }
         } else if (parsedItem[fieldKey] === null || parsedItem[fieldKey] === undefined) {
-            if (fieldKey === 'editHistory' || fieldKey === 'associatedSuggestions') {
+            if (fieldKey === 'editHistory' || fieldKey === 'associatedSuggestions' || fieldKey === 'items' || fieldKey === 'paymentsReceived' || fieldKey === 'stockHistory') {
                  parsedItem[fieldKey] = [];
-            } else if (fieldKey === 'imageContent' || fieldKey === 'reactions' || fieldKey === 'audioContent') {
+            } else if (fieldKey === 'imageContent' || fieldKey === 'reactions' || fieldKey === 'audioContent' || fieldKey === 'logoBase64' || fieldKey === 'productImage') {
                  parsedItem[fieldKey] = undefined;
             }
         }
     });
 
-    const booleanFieldsFromInt = ['isSettled', 'isDeleted', 'isRead']; 
+    const booleanFieldsFromInt = [
+        'isSettled', 'isDeleted', 'isRead', 'isDefault', 
+        'enableSchemaCheckOnStartup', 'enableDataFetchOnStartup'
+    ]; 
     booleanFieldsFromInt.forEach(field => {
       if (parsedItem[field] !== undefined && parsedItem[field] !== null) {
         parsedItem[field] = !!Number(parsedItem[field]);
+      } else if (field === 'enableSchemaCheckOnStartup' || field === 'enableDataFetchOnStartup') {
+        parsedItem[field] = true; 
       }
     });
     
-    const numericFields = ['amount', 'originalAmount', 'remainingAmount', 'balanceAfterEntry'];
+    if (parsedItem.paymentsReceived && Array.isArray(parsedItem.paymentsReceived)) {
+      parsedItem.paymentsReceived = parsedItem.paymentsReceived.map((payment: any) => {
+        const paymentAmountNum = parseFloat(payment.amount);
+        return {
+          ...payment,
+          amount: isNaN(paymentAmountNum) ? 0 : paymentAmountNum,
+        };
+      });
+    }
+
+    if (parsedItem.items && Array.isArray(parsedItem.items)) {
+        parsedItem.items = parsedItem.items.map((invoiceItem: any) => {
+            const quantityNum = parseFloat(invoiceItem.quantity);
+            const unitPriceNum = parseFloat(invoiceItem.unitPrice);
+            const totalNum = parseFloat(invoiceItem.total);
+            return {
+                ...invoiceItem,
+                quantity: isNaN(quantityNum) ? 0 : quantityNum,
+                unitPrice: isNaN(unitPriceNum) ? 0 : unitPriceNum,
+                total: isNaN(totalNum) ? 0 : totalNum,
+            };
+        });
+    }
+    
+    const numericFields = [
+        'amount', 'originalAmount', 'remainingAmount', 'balanceAfterEntry', 
+        'subtotal', 'discountValue', 'discountAmount', 'taxValue', 'taxAmount', 'totalAmount', 
+        'unitPrice', 'mrp', 'wholesalePrice', 'currentStock', 'lowStockThreshold', 'initialBalance',
+        'defaultSalesInvoiceDateOffset', 'defaultSalesDueDateOffset', 'defaultSalesDiscountValue', 'defaultSalesTaxValue',
+        'defaultPurchaseBillDateOffset', 'defaultPurchaseDueDateOffset', 'defaultPurchaseDiscountValue', 'defaultPurchaseTaxValue'
+    ]; 
     numericFields.forEach(field => {
         if (parsedItem[field] !== undefined && parsedItem[field] !== null) {
             const numVal = parseFloat(parsedItem[field]);
             if (!isNaN(numVal)) {
                 parsedItem[field] = numVal;
+            } else {
+                if (['unitPrice', 'mrp', 'wholesalePrice', 'defaultSalesInvoiceDateOffset', 'defaultSalesDueDateOffset', 'defaultSalesDiscountValue', 'defaultSalesTaxValue', 'defaultPurchaseBillDateOffset', 'defaultPurchaseDueDateOffset', 'defaultPurchaseDiscountValue', 'defaultPurchaseTaxValue'].includes(field)) {
+                    parsedItem[field] = undefined;
+                } else {
+                    parsedItem[field] = 0;
+                }
             }
+        } else {
+             if (['currentStock', 'lowStockThreshold', 'initialBalance'].includes(field)) {
+                parsedItem[field] = 0; 
+             } else if (['unitPrice', 'mrp', 'wholesalePrice', 'defaultSalesInvoiceDateOffset', 'defaultSalesDueDateOffset', 'defaultSalesDiscountValue', 'defaultSalesTaxValue', 'defaultPurchaseBillDateOffset', 'defaultPurchaseDueDateOffset', 'defaultPurchaseDiscountValue', 'defaultPurchaseTaxValue'].includes(field)) {
+                parsedItem[field] = undefined;
+             } else {
+                parsedItem[field] = 0;
+             }
         }
     });
     
-    const nullableFieldsFromDb: (keyof T)[] = ['customAlias', 'systemUserId', 'profileImage', 'email', 'facebookProfileUrl', 'deletedAt', 'linkedLedgerEntryId', 'originalDate', 'dueDate', 'settledDate', 'reset_code', 'reset_token_expiry', 'imageContent', 'audioContent', 'reactions', 'editHistory'] as (keyof T)[];
+    const nullableFieldsFromDb: string[] = [
+        'customAlias', 'systemUserId', 'profileImage', 'productImage', 'email', 'facebookProfileUrl', 
+        'defaultSalesPaymentStatus', 'defaultSalesInvoiceDateOffset', 'defaultSalesDueDateOffset', 'defaultSalesCompanyProfileId', 
+        'defaultSalesDiscountType', 'defaultSalesDiscountValue', 'defaultSalesTaxType', 'defaultSalesTaxValue', 
+        'defaultSalesPaymentMethod', 'defaultSalesPaymentNotes', 'defaultSalesInvoiceNotes', 
+        'defaultPurchaseBillDateOffset', 'defaultPurchaseDueDateOffset', 'defaultPurchaseCompanyProfileId', 
+        'defaultPurchaseDiscountType', 'defaultPurchaseDiscountValue', 'defaultPurchaseTaxType', 'defaultPurchaseTaxValue', 
+        'defaultBankAccountId', 
+        'deletedAt', 'linkedLedgerEntryId', 'originalDate', 'dueDate', 'settledDate', 'reset_code', 'reset_token_expiry', 
+        'imageContent', 'audioContent', 'reactions', 'editHistory', 
+        'discountType', 'discountValue', 'discountAmount', 'taxType', 'taxValue', 'taxAmount', 'notes', 'items', 'paymentsReceived', 
+        'description', 'unitPrice', 'unit', 'address', 'phone', 'logoBase64', 'taxId', 'companyProfileId', 
+        'stockUnit', 'stockHistory', 'mrp', 'wholesalePrice',
+        'accountNumber', 'bankName', 'branchName', 'bankAccountId', 'bankAccountName' 
+    ];
     nullableFieldsFromDb.forEach(field => {
         if (parsedItem[field as string] === null) {
-            // Ensure editHistory defaults to [] if null from DB
-            if (field as string === 'editHistory') {
+            if (field === 'editHistory' || field === 'items' || field === 'paymentsReceived' || field === 'associatedSuggestions' || field === 'stockHistory') {
                 parsedItem[field as string] = [];
-            } else {
+            } else if (String(field).endsWith('Value') || String(field).endsWith('Offset') || ['unitPrice', 'logoBase64', 'stockUnit', 'productImage', 'mrp', 'wholesalePrice', 'defaultSalesPaymentMethod', 'defaultSalesPaymentNotes', 'defaultSalesInvoiceNotes'].includes(field)) { 
+                 parsedItem[field as string] = undefined;
+            }
+             else {
                 parsedItem[field as string] = undefined;
             }
         }
     });
+    
+    if (parsedItem.hasOwnProperty('stockUnit') && (parsedItem.stockUnit === undefined || parsedItem.stockUnit === null)) {
+        parsedItem.stockUnit = "পিস"; 
+    }
+    if (!parsedItem.hasOwnProperty('stockUnit') && item.hasOwnProperty('name')) { // For product-like items
+        parsedItem.stockUnit = "পিস";
+    }
 
     return parsedItem as T;
 }
@@ -290,15 +505,13 @@ export async function fetchRecords<T>(
   baseTableName: string, 
   userIdForContext: string, 
   whereClause: string = "1",
-  includeDeleted: boolean = false // This applies to 'transactions' and 'persons' primarily
+  includeDeleted: boolean = false 
 ): Promise<T[]> {
   if (!userIdForContext && baseTableName !== 'users') throw new Error("User ID context required for fetching records from non-user tables.");
   
   let finalWhereClause = baseTableName === 'users' ? whereClause : addUserScopeToWhereClause(whereClause, userIdForContext);
 
-  // Soft delete check is specific to tables that implement it.
-  // For 'messages', isDeleted is owner-specific and filtering happens client-side based on context.
-  const softDeleteTablesWithGlobalFlag = ['transactions', 'persons']; 
+  const softDeleteTablesWithGlobalFlag = ['transactions', 'persons', 'invoices', 'products', 'company_profiles', 'bank_accounts']; 
   if (softDeleteTablesWithGlobalFlag.includes(baseTableName) && !includeDeleted) {
     finalWhereClause = `${finalWhereClause} AND (isDeleted IS NULL OR isDeleted = 0)`;
   }
@@ -337,20 +550,68 @@ export async function insertRecord(baseTableName: string, userIdForContext: stri
   } else {
     console.warn(`Schema not found for table ${baseTableName} in apiService.insertRecord. Sending all processed fields.`);
   }
-  // Ensure editHistory is initialized if not present, especially for new messages
-  if (baseTableName === 'messages' && !processedData.editHistory) {
-    const initialVersion: import('./types').MessageVersion = {
-        timestamp: processedData.timestamp || new Date().toISOString(),
+  
+  if ((baseTableName === 'messages' || baseTableName === 'invoices' || baseTableName === 'transactions' || baseTableName === 'persons' || baseTableName === 'debts' || baseTableName === 'bank_accounts') && !processedData.editHistory) {
+    const initialVersionContent: any = { isDeleted: false };
+     let timestampForHistory = new Date().toISOString();
+
+    if(baseTableName === 'transactions') {
+        initialVersionContent.date = processedData.date;
+        initialVersionContent.description = processedData.description;
+        initialVersionContent.amount = processedData.amount;
+        initialVersionContent.type = processedData.type;
+        initialVersionContent.bankAccountId = processedData.bankAccountId;
+        initialVersionContent.bankAccountName = processedData.bankAccountName;
+        timestampForHistory = processedData.lastModified || processedData.date || timestampForHistory;
+    } else if (baseTableName === 'persons') {
+        initialVersionContent.name = processedData.name;
+        initialVersionContent.mobileNumber = processedData.mobileNumber;
+        initialVersionContent.email = processedData.email;
+        timestampForHistory = processedData.lastModified || processedData.createdAt || timestampForHistory;
+    } else if (baseTableName === 'debts') {
+        initialVersionContent.personId = processedData.personId;
+        initialVersionContent.originalAmount = processedData.originalAmount;
+        initialVersionContent.remainingAmount = processedData.remainingAmount;
+        initialVersionContent.type = processedData.type;
+        initialVersionContent.isSettled = processedData.isSettled;
+        initialVersionContent.creationDate = processedData.creationDate;
+        timestampForHistory = processedData.lastModified || processedData.creationDate || timestampForHistory;
+    } else if (baseTableName === 'messages') {
+      initialVersionContent.content = processedData.content;
+      initialVersionContent.imageContent = processedData.imageContent ? JSON.parse(processedData.imageContent) : undefined;
+      initialVersionContent.audioContent = processedData.audioContent ? JSON.parse(processedData.audioContent) : undefined;
+      timestampForHistory = processedData.timestamp || timestampForHistory;
+    } else if (baseTableName === 'invoices') {
+        initialVersionContent.invoiceNumber = processedData.invoiceNumber;
+        initialVersionContent.invoiceType = processedData.invoiceType; 
+        initialVersionContent.invoiceDate = processedData.invoiceDate;
+        initialVersionContent.dueDate = processedData.dueDate;
+        initialVersionContent.personId = processedData.personId;
+        initialVersionContent.companyProfileId = processedData.companyProfileId; 
+        initialVersionContent.items = processedData.items ? JSON.parse(processedData.items) : [];
+        initialVersionContent.subtotal = processedData.subtotal;
+        initialVersionContent.totalAmount = processedData.totalAmount;
+        initialVersionContent.paymentStatus = processedData.paymentStatus;
+        initialVersionContent.paymentsReceived = processedData.paymentsReceived ? JSON.parse(processedData.paymentsReceived) : [];
+        timestampForHistory = processedData.lastModified || processedData.createdAt || timestampForHistory;
+    } else if (baseTableName === 'bank_accounts') {
+        initialVersionContent.accountName = processedData.accountName;
+        initialVersionContent.accountType = processedData.accountType;
+        initialVersionContent.initialBalance = processedData.initialBalance;
+        initialVersionContent.balanceEffectiveDate = processedData.balanceEffectiveDate;
+        initialVersionContent.isDefault = processedData.isDefault;
+        initialVersionContent.currency = processedData.currency; // Ensure currency is part of snapshot
+        timestampForHistory = processedData.lastModified || processedData.createdAt || timestampForHistory;
+    }
+
+
+    const initialVersionEntry = {
+        timestamp: timestampForHistory,
         action: 'created',
-        userId: userIdForContext, // Or actualSenderId if appropriate for context
-        snapshot: {
-            content: processedData.content,
-            imageContent: processedData.imageContent ? JSON.parse(processedData.imageContent) : undefined,
-            audioContent: processedData.audioContent ? JSON.parse(processedData.audioContent) : undefined,
-            isDeleted: false,
-        }
+        userId: userIdForContext,
+        snapshot: initialVersionContent,
     };
-    processedData.editHistory = JSON.stringify([initialVersion]);
+    processedData.editHistory = JSON.stringify([initialVersionEntry]);
   }
 
 
@@ -391,9 +652,6 @@ export async function updateRecord(baseTableName: string, userIdForContext: stri
 }
 
 export async function deleteRecord(baseTableName: string, userIdForContext: string, whereClause: string): Promise<any> {
-  // This function performs HARD deletes. Soft deletes are handled by updateRecord.
-  // For messages, this will be used for a user deleting their own copy IF they implement true permanent delete from archive later.
-  // The current "delete" from chat is a soft delete via updateRecord.
   if (!userIdForContext && baseTableName !== 'users' && baseTableName !== 'user_transaction_suggestions') { 
      throw new Error("User ID context required for deleting records from non-user tables.");
   }
@@ -410,23 +668,23 @@ export async function deleteRecord(baseTableName: string, userIdForContext: stri
 }
 
 
-export async function fetchUserSuggestions(userIdForContext: string): Promise<import('./types').UserSuggestion[]> {
+export async function fetchUserSuggestions(userIdForContext: string): Promise<UserSuggestion[]> {
   if (!userIdForContext) throw new Error("User ID required for fetching suggestions.");
   const baseTableName = 'user_transaction_suggestions';
   try {
-    const records = await fetchRecords<import('./types').UserSuggestion>(baseTableName, userIdForContext, "1");
-    return records; // Already parsed by fetchRecords
+    const records = await fetchRecords<UserSuggestion>(baseTableName, userIdForContext, "1");
+    return records; 
   } catch (error: any) {
     console.warn(`Could not fetch suggestions for user ${userIdForContext}. Error: ${error.message}`);
     return [];
   }
 }
 
-export async function addUserSuggestion(userIdForContext: string, suggestionData: Omit<import('./types').UserSuggestion, 'userId'>): Promise<any> {
+export async function addUserSuggestion(userIdForContext: string, suggestionData: Omit<UserSuggestion, 'userId'>): Promise<any> {
   if (!userIdForContext) throw new Error("User ID required for adding suggestion.");
   const baseTableName = 'user_transaction_suggestions';
   const dataToInsert = {
-    ...suggestionData, // id, text, type
+    ...suggestionData, 
     user_id: userIdForContext,
   };
   return insertRecord(baseTableName, userIdForContext, dataToInsert);
@@ -487,14 +745,14 @@ export async function initializeSharedTablesIfNeeded(): Promise<void> {
             console.log(`Add column '${expectedColumn.name}' to '${tableName}': Success: ${addColumnResponse.success}, SQL: ${addColumnResponse.sql || 'N/A'}, Error: ${addColumnResponse.error || 'N/A'}`);
             if (addColumnResponse.success === false) {
                  console.warn(`Failed to add column '${expectedColumn.name}' to table '${tableName}'. Error: ${addColumnResponse.error}. This might cause issues.`);
-                 if ( (tableName === 'transactions' || tableName === 'persons' || tableName === 'debts' || tableName === 'messages') && (expectedColumn.name === 'editHistory') ) {
+                 if ( (tableName === 'transactions' || tableName === 'persons' || tableName === 'debts' || tableName === 'messages' || tableName === 'invoices' || tableName === 'company_profiles' || tableName === 'products' || tableName === 'bank_accounts') && (expectedColumn.name === 'editHistory' || expectedColumn.name === 'logoBase64' || expectedColumn.name === 'stockHistory' || expectedColumn.name === 'productImage') ) { 
                     throw new Error(`Critical column '${expectedColumn.name}' (MEDIUMTEXT) could not be added to '${tableName}'.`);
                  }
                  if (tableName === 'persons' && (expectedColumn.name === 'profileImage' || expectedColumn.name === 'email' || expectedColumn.name === 'customAlias' || expectedColumn.name === 'systemUserId')) { 
                      throw new Error(`Critical column '${expectedColumn.name}' could not be added to 'persons' table.`);
                  }
-                 if (tableName === 'users' && (expectedColumn.name === 'reset_code' || expectedColumn.name === 'reset_token_expiry')) {
-                    throw new Error(`Critical password reset column '${expectedColumn.name}' could not be added to 'users' table.`);
+                 if (tableName === 'users' && (expectedColumn.name === 'reset_code' || expectedColumn.name === 'reset_token_expiry' || expectedColumn.name.startsWith('defaultSales') || expectedColumn.name.startsWith('defaultPurchase') || expectedColumn.name === 'defaultBankAccountId' )) {
+                    throw new Error(`Critical column '${expectedColumn.name}' could not be added to 'users' table.`);
                  }
                   if (tableName === 'users' && expectedColumn.name === 'mobileNumber') {
                     throw new Error(`Critical column 'mobileNumber' could not be added to 'users' table.`);
@@ -504,6 +762,15 @@ export async function initializeSharedTablesIfNeeded(): Promise<void> {
                  }
                  if (tableName === 'messages' && (expectedColumn.name === 'threadId' || expectedColumn.name === 'actualSenderId' || expectedColumn.name === 'actualReceiverId' || expectedColumn.name === 'imageContent' || expectedColumn.name === 'reactions' || expectedColumn.name === 'audioContent' || expectedColumn.name === 'isDeleted' || expectedColumn.name === 'deletedAt' )) { 
                     throw new Error(`Critical column '${expectedColumn.name}' could not be added to 'messages' table.`);
+                 }
+                 if (tableName === 'invoices' && (expectedColumn.name === 'items' || expectedColumn.name === 'paymentsReceived' || expectedColumn.name === 'companyProfileId' || expectedColumn.name === 'invoiceType' )) {
+                    throw new Error(`Critical column '${expectedColumn.name}' could not be added to 'invoices' table.`);
+                 }
+                 if (tableName === 'products' && (expectedColumn.name === 'currentStock' || expectedColumn.name === 'stockUnit' || expectedColumn.name === 'lowStockThreshold' || expectedColumn.name === 'stockHistory' || expectedColumn.name === 'productImage' || expectedColumn.name === 'mrp' || expectedColumn.name === 'wholesalePrice') ) { 
+                     throw new Error(`Critical column '${expectedColumn.name}' could not be added to 'products' table.`);
+                 }
+                 if (tableName === 'transactions' && (expectedColumn.name === 'bankAccountId' || expectedColumn.name === 'bankAccountName')) {
+                     throw new Error(`Critical column '${expectedColumn.name}' could not be added to 'transactions' table.`);
                  }
             }
           }
@@ -535,7 +802,7 @@ export async function fetchUserByMobile(mobileNumber: string): Promise<User | nu
   try {
     const response = await makeApiRequest({
       method: 'tableFetch',
-      table: 'users', // Global users table
+      table: 'users', 
       where: `mobileNumber = '${trimmedMobile.replace(/'/g, "''")}'`,
     });
     if (response.success && response.data && Array.isArray(response.data) && response.data.length > 0) {

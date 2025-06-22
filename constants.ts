@@ -1,552 +1,19 @@
 
+import { BN_UI_TEXT as AllBnUiTexts } from './i18n/bn'; // Import the aggregated texts
 
+export const BN_UI_TEXT = AllBnUiTexts; // Re-export for existing imports
 
-export const BN_UI_TEXT = {
-  APP_TITLE: "দৈনিক আয়-ব্যয় ট্র্যাকার",
-  ADD_NEW_TRANSACTION: "নতুন লেনদেন যোগ করুন",
-  DESCRIPTION: "বিবরণ",
-  AMOUNT: "টাকার পরিমাণ",
-  TRANSACTION_TYPE: "লেনদেনের ধরণ",
-  INCOME: "আয়",
-  EXPENSE: "ব্যয়",
-  ADD_TRANSACTION_BTN: "লেনদেন যোগ করুন",
-  TRANSACTION_HISTORY: "লেনদেনের ইতিহাস",
-  NO_TRANSACTIONS: "এখনও কোন লেনদেন যোগ করা হয়নি।",
-  TOTAL_INCOME: "মোট আয়",
-  TOTAL_EXPENSE: "মোট ব্যয়",
-  CURRENT_BALANCE: "বর্তমান ব্যালেন্স",
-  TOTAL_PAYABLE: "মোট দেনা (পরিশোধযোগ্য)",
-  TOTAL_RECEIVABLE: "মোট পাওনা (আদায়যোগ্য)",
-  DATE: "তারিখ",
-  DELETE_TRANSACTION_TOOLTIP: "লেনদেন মুছুন",
-  FINANCIAL_ADVICE_SECTION_TITLE: "আর্থিক পরামর্শ",
-  GET_ADVICE_BTN: "পরামর্শ পান",
-  LOADING: "লোড হচ্ছে...",
-  ADVICE_ERROR: "প পরামর্শ আনতে ত্রুটি হয়েছে। অনুগ্রহ করে API কী পরীক্ষা করুন অথবা পরে আবার চেষ্টা করুন।",
-  API_KEY_INFO: "AI পরামর্শ বৈশিষ্ট্যটির জন্য API কী প্রয়োজন।",
-  API_KEY_NOT_CONFIGURED: " API কী কনফিগার করা নেই। AI পরামর্শ বৈশিষ্ট্যটি নিষ্ক্রিয়।",
-  CONFIRM_DELETE_MSG: "আপনি কি এই লেনদেনটি তালিকা থেকে সরাতে চান?",
-  BDT_SYMBOL: "৳",
-  DESCRIPTION_PLACEHOLDER: "যেমন: মুদিখানার সামগ্রী, বেতন",
-  AMOUNT_PLACEHOLDER: "1000",
-  ITEM_DELETED: "লেনদেন সফলভাবে সরানো হয়েছে।",
-  ADVICE_FROM_GEMINI: "Gemini AI থেকে পরামর্শ:",
-  EDIT_TRANSACTION: "লেনদেন সম্পাদনা করুন",
-  EDIT_TRANSACTION_TOOLTIP: "লেনদেন সম্পাদনা করুন",
-  SAVE_CHANGES: "পরিবর্তন সংরক্ষণ করুন",
-  CANCEL: "বাতিল",
-  TRANSACTION_UPDATED: "লেনদেন সফলভাবে আপডেট করা হয়েছে।",
-  FORM_VALIDATION_ERROR: "অনুগ্রহ করে সঠিক বিবরণ এবং টাকার পরিমাণ লিখুন।",
-  DEBT_MANAGEMENT_TITLE: "ধার-দেনা ব্যবস্থাপনা",
-  ADD_NEW_DEBT: "নতুন দেনা/পাওনা যোগ করুন", 
-  PERSON_NAME: "ব্যক্তির নাম", 
-  PERSON_NAME_PLACEHOLDER: "যেমন: করিম ভাই", 
-  DEBT_TYPE: "দেনা/পাওনার ধরণ", 
-  PAYABLE: "পরিশোধ করতে হবে (দেনা)", 
-  RECEIVABLE: "পাওয়া যাবে (পাওনা)", 
-  DUE_DATE: "পরিশোধের শেষ তারিখ (ঐচ্ছিক)",
-  ADD_DEBT_BTN: "দেনা/পাওনা যোগ করুন", 
-  DEBT_LIST_TITLE: "দেনা/পাওনার তালিকা",
-  RECEIVABLES_SUBTITLE: "পাওনা সমূহ (যা আপনি পাবেন)",
-  PAYABLES_SUBTITLE: "দেনা সমূহ (যা আপনাকে পরিশোধ করতে হবে)",
-  NO_DEBTS_PAYABLE: "কোন পরিশোধযোগ্য দেনা নেই।",
-  NO_DEBTS_RECEIVABLE: "কোন আদায়যোগ্য পাওনা নেই।",
-  MARK_AS_SETTLED: "পরিশোধিত হিসাবে চিহ্নিত করুন",
-  MARK_AS_UNSETTLED: "অপরিশোধিত হিসাবে চিহ্নিত করুন",
-  SETTLED_ON: "পরিশোধিত হয়েছে:",
-  DUE_ON: "শেষ তারিখ:",
-  CREATED_ON: "তৈরী হয়েছে:",
-  STATUS: "অবস্থা",
-  SETTLED_STATUS: "পরিশোধিত",
-  UNSETTLED_STATUS: "অপরিশোধিত",
-  DELETE_DEBT_TOOLTIP: "দেনা/পাওনা মুছুন",
-  CONFIRM_DELETE_DEBT_MSG: "আপনি কি এই দেনা/পাওনা এন্ট্রিটি মুছে ফেলতে চান? এই কাজটি আর ফেরানো যাবে না।",
-  DEBT_ADDED: "দেনা/পাওনা যোগ করা হয়েছে।",
-  DEBT_UPDATED: "দেনা/পাওনা সফলভাবে আপডেট করা হয়েছে।",
-  DEBT_DELETED: "দেনা/পাওনা সফলভাবে মোছা হয়েছে।",
-  DEBT_SETTLED_INCOME_DESC: "{personName} এর কাছ থেকে পাওনা টাকা ({description}) আদায় হয়েছে।",
-  DEBT_SETTLED_EXPENSE_DESC: "{personName} কে দেনা বাবদ ({description}) টাকা পরিশোধ করা হয়েছে।",
-  DEBT_DESCRIPTION_PLACEHOLDER: "যেমন: ধার, অগ্রিম",
-  DEBT_HISTORY_PAID_BY_LEDGER_CREDIT: "(লেজার এন্ট্রি (জমা) দ্বারা {amount} পরিশোধিত)",
-  DEBT_HISTORY_PAID_BY_LEDGER_DEBIT: "(লেজার এন্ট্রি (খরচ) দ্বারা {amount} পরিশোধিত)",
-  
-  LOGIN: "লগইন",
-  SIGNUP: "সাইনআপ",
-  LOGOUT: "লগআউট",
-  EMAIL: "ইমেইল",
-  EMAIL_OR_MOBILE: "ইমেইল অথবা মোবাইল নম্বর",
-  PASSWORD: "পাসওয়ার্ড",
-  NAME: "নাম",
-  NAME_PLACEHOLDER: "আপনার নাম",
-  EMAIL_PLACEHOLDER: "user@example.com অথবা 01XXXXXXXXX",
-  PASSWORD_PLACEHOLDER: "********",
-  DONT_HAVE_ACCOUNT: "অ্যাকাউন্ট নেই?",
-  ALREADY_HAVE_ACCOUNT: "ইতিমধ্যে অ্যাকাউন্ট আছে?",
-  LOGIN_SUCCESS: "সফলভাবে লগইন করেছেন।",
-  SIGNUP_SUCCESS: "সাইনআপ সফল হয়েছে।",
-  LOGOUT_SUCCESS: "সফলভাবে লগআউট করেছেন।",
-  AUTH_ERROR_GENERAL: "একটি ত্রুটি ঘটেছে। অনুগ্রহ করে আবার চেষ্টা করুন।",
-  AUTH_ERROR_INVALID_CREDENTIALS: "ইমেইল/মোবাইল অথবা পাসওয়ার্ড সঠিক নয়।",
-  AUTH_ERROR_EMAIL_EXISTS: "এই ইমেইল দিয়ে ইতিমধ্যে একটি অ্যাকাউন্ট খোলা আছে।",
-  WELCOME_EMAIL_SUBJECT: "আয়-ব্যয় ট্র্যাকারে স্বাগতম!",
-  MOCKED_AUTH_WARNING_TITLE: "সিমুলেটেড অথেনটিকেশন:", 
-  MOCKED_AUTH_WARNING_DESC: "এই অ্যাপটি পূর্বে সিমুলেটেড লগইন/সাইনআপ ব্যবহার করতো। বর্তমানে এটি ব্যাকএন্ডের সাথে সংযুক্ত হওয়ার চেষ্টা করছে।", 
-
-  PLEASE_CONFIGURE_APIS: "অনুগ্রহ করে প্রথমে API কনফিগার করুন।", 
-  USER_NOT_LOGGED_IN_DATA: "লেনদেন ও দেনা-পাওনা দেখতে অনুগ্রহ করে লগইন করুন অথবা সাইনআপ করুন।",
-  WELCOME_TO_APP: "অ্যাপে স্বাগতম",
-  PLEASE_LOGIN_SIGNUP_TO_PROCEED: "চালিয়ে যেতে অনুগ্রহ করে লগইন অথবা সাইনআপ করুন।",
-  PLEASE_CONFIGURE_APIS_FIRST_IF_PROBLEM: "যদি কোনো সমস্যা হয়, প্রথমে অনুগ্রহ করে API গুলি কনফিগার করুন।", 
-
-  EDIT_DEBT_MODAL_TITLE: "দেনা/পাওনা সম্পাদনা করুন",
-  EDIT_DEBT_TOOLTIP: "দেনা/পাওনা সম্পাদনা করুন",
-  LAST_MODIFIED_ON: "সর্বশেষ সম্পাদিত:",
-  VIEW_HISTORY_TOOLTIP: "সম্পাদনার ইতিহাস দেখুন",
-  HISTORY_TITLE_PREFIX: "সম্পাদনার ইতিহাস:", 
-  TRANSACTION_HISTORY_MODAL_TITLE: "লেনদেন সম্পাদনার ইতিহাস",
-  DEBT_HISTORY_MODAL_TITLE: "দেনা/পাওনা সম্পাদনার ইতিহাস",
-  HISTORY_LOG_FOR_ITEM: "'{itemName}' এর জন্য পরিবর্তনের লগ:",
-  NO_HISTORY: "কোনো সম্পাদনার ইতিহাস এখনো তৈরি হয়নি।",
-  VERSION_AT_TIMESTAMP: "সংস্করণ, সময়:",
-  ACTION_CREATED: "তৈরি হয়েছে",
-  ACTION_UPDATED: "আপডেট হয়েছে",
-  ACTION_DELETED: "সরানো হয়েছে",
-  ACTION_RESTORED: "পুনরুদ্ধার করা হয়েছে",
-  FIELD_CHANGES_FROM_TO: "'{field}' পরিবর্তিত হয়েছে '{oldValue}' থেকে '{newValue}'",
-  EDITED_BY_ON: "{userId} দ্বারা সম্পাদিত হয়েছে {timestamp} তারিখে",
-  INITIAL_STATE: "প্রাথমিক অবস্থা",
-  FIELD_NAME_DESCRIPTION: "বিবরণ",
-  FIELD_NAME_AMOUNT: "টাকার পরিমাণ", 
-  FIELD_NAME_ORIGINAL_AMOUNT: "মূল পরিমাণ", 
-  FIELD_NAME_REMAINING_AMOUNT: "বাকি পরিমাণ", 
-  FIELD_NAME_TYPE: "ধরণ",
-  FIELD_NAME_DATE: "তারিখ",
-  FIELD_NAME_PERSON_ID: "ব্যক্তি আইডি", 
-  FIELD_NAME_PERSON_NAME: "ব্যক্তির নাম", 
-  FIELD_NAME_DUE_DATE: "শেষ তারিখ",
-  FIELD_NAME_IS_SETTLED: "পরিশোধিত অবস্থা",
-  FIELD_NAME_IS_DELETED: "সরানো হয়েছে কি?",
-  FIELD_NAME_DELETED_AT: "সরানোর তারিখ",
-  FIELD_NAME_CREATION_DATE: "তৈরির তারিখ",
-  FIELD_NAME_SETTLED_DATE: "পরিশোধের তারিখ",
-  FIELD_VALUE_TRUE: "হ্যাঁ",
-  FIELD_VALUE_FALSE: "না",
-  CLOSE_BTN: "বন্ধ করুন",
-
-  RESET_APP_DATA_BTN: "অ্যাপ ডেটা রিসেট করুন",
-  CONFIRM_RESET_APP_DATA_MSG: "আপনি কি নিশ্চিত যে আপনি অ্যাপ্লিকেশনের সমস্ত সংরক্ষিত ডেটা মুছতে চান? এই ক্রিয়াটি ফেরানো যাবে না এবং সমস্ত ব্যবহারকারীর লেনদেন, দেনা-পাওনা এবং অ্যাকাউন্ট মুছে যাবে।",
-  APP_DATA_RESET_SUCCESS: "অ্যাপ ডেটা সফলভাবে রিসেট করা হয়েছে। পৃষ্ঠাটি রিলোড হচ্ছে...",
-
-  MODAL_TITLE_ADD_TRANSACTION: "নতুন লেনদেন যোগ করুন",
-  MODAL_TITLE_ADD_INCOME: "নতুন আয় যোগ করুন",
-  MODAL_TITLE_ADD_EXPENSE: "নতুন ব্যয় যোগ করুন",
-  ADD_INCOME_BTN_TEXT: "আয় যোগ করুন",
-  ADD_EXPENSE_BTN_TEXT: "ব্যয় যোগ করুন",
-  HEADER_ADD_INCOME_BTN: "আয় যোগ",
-  HEADER_ADD_EXPENSE_BTN: "ব্যয় যোগ",
-
-  MODAL_TITLE_ADD_DEBT: "নতুন দেনা/পাওনা যোগ করুন",
-  MODAL_TITLE_TRANSACTION_HISTORY: "লেনদেনের ইতিহাস",
-  MODAL_TITLE_REPORTS: "রিপোর্ট দেখুন", 
-
-  PERSON_LIST_TITLE: "ব্যক্তিদের তালিকা",
-  ADD_NEW_PERSON_BTN: "নতুন ব্যক্তি যোগ করুন",
-  EDIT_PERSON_BTN_LABEL: "ব্যক্তি সম্পাদনা করুন",
-  DELETE_PERSON_BTN_LABEL: "ব্যক্তি মুছুন",
-  PERSON_MOBILE_NUMBER: "মোবাইল নম্বর",
-  PERSON_ADDRESS: "ঠিকানা",
-  PERSON_SHOP_NAME: "দোকানের নাম (যদি থাকে)",
-  PERSON_EMAIL_LABEL: "ইমেইল (ঐচ্ছিক)",
-  PERSON_EMAIL_PLACEHOLDER: "person@example.com",
-  PERSON_PROFILE_IMAGE: "প্রোফাইল ছবি", 
-  UPLOAD_IMAGE_BTN: "ছবি আপলোড করুন", 
-  CHANGE_IMAGE_BTN: "ছবি পরিবর্তন করুন", 
-  REMOVE_IMAGE_BTN: "ছবি সরান", 
-  IMAGE_PREVIEW_ALT: "প্রোফাইল ছবির প্রিভিউ", 
-  IMAGE_SIZE_TOO_LARGE_ERROR: "ছবির ফাইলের আকার 1MB এর বেশি হতে পারবে না।", 
-  FIELD_NAME_PERSON_PROFILE_IMAGE: "প্রোফাইল ছবি", 
-  PROFILE_IMAGE_UPDATED: "প্রোফাইল ছবি আপডেট করা হয়েছে।", 
-  PROFILE_IMAGE_REMOVED: "প্রোফাইল ছবি সরানো হয়েছে।", 
-  PROFILE_IMAGE_ADDED: "প্রোফাইল ছবি যোগ করা হয়েছে।", 
-  PERSON_MOBILE_PLACEHOLDER: "01XXXXXXXXX",
-  PERSON_ADDRESS_PLACEHOLDER: "বাড়ির ঠিকানা",
-  PERSON_SHOP_NAME_PLACEHOLDER: "দোকানের নাম",
-  SAVE_PERSON_BTN: "ব্যক্তি সংরক্ষণ করুন",
-  NO_PERSONS_FOUND: "এখনও কোনো ব্যক্তি যোগ করা হয়নি।",
-  CONFIRM_DELETE_PERSON_MSG: "আপনি কি এই ব্যক্তিকে তালিকা থেকে মুছে ফেলতে চান? এই কাজটি আর ফেরানো যাবে না। এর সাথে সম্পর্কিত দেনা/পাওনার তথ্য প্রভাবিত হবে না।",
-  PERSON_ADDED_SUCCESS: "নতুন ব্যক্তি সফলভাবে যোগ করা হয়েছে।",
-  PERSON_UPDATED_SUCCESS: "ব্যক্তির তথ্য সফলভাবে আপডেট করা হয়েছে।",
-  PERSON_DELETED_SUCCESS: "ব্যক্তিকে তালিকা থেকে সফলভাবে মোছা হয়েছে।",
-  SEARCH_PERSON_PLACEHOLDER: "নাম বা মোবাইল নম্বর দিয়ে খুঁজুন...",
-  MANAGE_PERSONS_MODAL_TITLE: "ব্যক্তি ব্যবস্থাপনা",
-  ADD_PERSON_MODAL_TITLE: "নতুন ব্যক্তি যোগ করুন",
-  EDIT_PERSON_MODAL_TITLE: "ব্যক্তি সম্পাদনা করুন",
-  PERSON_HISTORY_MODAL_TITLE: "ব্যক্তির তথ্য পরিবর্তনের ইতিহাস",
-  SELECT_PERSON_MODAL_TITLE: "ব্যক্তি নির্বাচন করুন",
-  SELECT_PERSON_BTN_TITLE: "ব্যক্তি নির্বাচন করুন",
-  PERSON_NOT_SELECTED_PLACEHOLDER: "ব্যক্তি এখনো নির্বাচন করা হয়নি", 
-  UNKNOWN_PERSON: "অজানা ব্যক্তি",
-  FIELD_NAME_PERSON_MOBILE: "মোবাইল নম্বর",
-  FIELD_NAME_PERSON_EMAIL: "ইমেইল",
-  FIELD_NAME_PERSON_ADDRESS: "ঠিকানা",
-  FIELD_NAME_PERSON_SHOP_NAME: "দোকানের নাম",
-  PERSON_DETAILS: "ব্যক্তির বিবরণ",
-  PERSON_NAME_REQUIRED: "ব্যক্তির নাম আবশ্যক। অনুগ্রহ করে একটি নাম লিখুন অথবা তালিকা থেকে নির্বাচন করুন।",
-  PERSON_ADDED_IMPLICITLY_DEBT: "\"{personName}\" নামে নতুন ব্যক্তি যোগ করা হয়েছে এবং দেনা/পাওনা এন্ট্রি তৈরি করা হয়েছে।",
-  PERSON_ADDED_IMPLICITLY_FOR_ENTRY: "\"{personName}\" নামে নতুন ব্যক্তি যোগ করা হয়েছে এবং আর্থিক এন্ট্রি তৈরি করা হয়েছে।",
-  PERSON_SAVED_AFTER_IMPORT: "আমদানি করা ব্যক্তি সফলভাবে সংরক্ষণ করা হয়েছে।",
-  PERSON_DEBTS_HISTORY_MODAL_TITLE: "{personName} এর দেনা-পাওনার বিবরণ",
-  VIEW_PERSON_DEBTS_HISTORY_TOOLTIP: "ব্যক্তির দেনা-পাওনার বিবরণ দেখুন",
-  NO_DEBTS_FOR_PERSON: "এই ব্যক্তির জন্য কোনো দেনা/পাওনা খুঁজে পাওয়া যায়নি।",
-  MOBILE_NUMBER_DUPLICATE: "এই মোবাইল নম্বরটি ({mobileNumber}) ইতিমধ্যে {personNamesString} ব্যবহার করছেন। অনুগ্রহ করে একটি ভিন্ন মোবাইল নম্বর ব্যবহার করুন।",
-  PERSON_EMAIL_DUPLICATE: "এই ইমেইল ঠিকানাটি ({email}) ইতিমধ্যে আপনি {personNamesString} এর জন্য ব্যবহার করছেন। অনুগ্রহ করে একটি ভিন্ন ইমেইল ব্যবহার করুন অথবা বিদ্যমান ব্যক্তিকে সম্পাদনা করুন।",
-  INVALID_EMAIL_FORMAT: "অনুগ্রহ করে একটি সঠিক ইমেইল ঠিকানা লিখুন।",
-  NO_SUGGESTIONS_FOUND: "কোনো পরামর্শ পাওয়া যায়নি।",
-  TRANSACTION_DESCRIPTION_NO_SUGGESTIONS: "কোনো বিবরণ মেলেনি।",
-  IMPORT_SYSTEM_USER_PROMPT: "এই মোবাইল নম্বরটি একজন রেজিস্টার্ড ব্যবহারকারীর। ব্যবহারকারীর তথ্য যোগ করবেন?",
-  CONFIRM_SAVE_IMPORTED_PERSON: "ব্যবহারকারীর তথ্য ({USER_NAME}, {USER_EMAIL}) যোগ করা হয়েছে। এই ব্যক্তিকে আপনার তালিকায় সংরক্ষণ করবেন?",
-  IMPORT_USER_DETAILS_BTN: "তথ্য যোগ করুন",
-  USER_DETAILS_IMPORTED: "ব্যবহারকারীর তথ্য সফলভাবে যোগ করা হয়েছে।",
-  FIELD_NAME_CUSTOM_ALIAS: "ডাক নাম (ঐচ্ছিক)", 
-  CUSTOM_ALIAS_PLACEHOLDER: "আপনার বোঝার সুবিধার জন্য একটি নাম দিন", 
-  SYSTEM_LINKED_NAME_LABEL: "সিস্টেম-লিঙ্ক করা নাম (সম্পাদনাযোগ্য নয়)", 
-  SYSTEM_NAME_INDICATOR: "(সিস্টেম থেকে)", 
-  SYSTEM_USER_UNLINKED_FORM_EDITABLE: "সিস্টেম ব্যবহারকারীর সাথে লিঙ্ক সরানো হয়েছে। নামটি এখন সম্পাদনাযোগ্য।",
-
-  ENTRY_NATURE_LABEL: "এন্ট্রির ধরণ",
-  DEBT_PAYABLE_USER_OWES: "পরিশোধ করতে হবে (আপনি দেনাদার)", 
-  DEBT_RECEIVABLE_USER_IS_OWED: "পাওয়া যাবে (আপনি পাওনাদার)", 
-  PERSON_PAYMENT_RECEIVED_LEDGER_CREDIT: "ব্যক্তি পরিশোধ করেছেন (আপনার হিসাবে জমা)",
-  PERSON_PAYMENT_MADE_BY_USER_LEDGER_DEBIT: "আপনি পরিশোধ করছেন (ব্যক্তির নামে খরচ)", 
-  PAYMENT_DATE: "পরিশোধের তারিখ",
-  ADD_ENTRY_BTN: "এন্ট্রি যোগ করুন",
-  LEDGER_ENTRY_FROM_DEBT_FORM_SUCCESS: "ব্যক্তির পরিশোধ সফলভাবে হিসাবে জমা করা হয়েছে।",
-  LEDGER_ENTRY_USER_PAYMENT_SUCCESS: "আপনার পরিশোধ সফলভাবে ব্যক্তির হিসাবে খরচ লেখা হয়েছে।", 
-  DEBT_FORM_ALERT_PAYMENT_DATE_REQUIRED: "অনুগ্রহ করে পরিশোধের তারিখ নির্বাচন করুন।",
-  PERSON_OWES_YOU_NET_DEBT_LABEL: "এই ব্যক্তির কাছে আপনি পাবেন (মোট জের):",
-  YOU_OWE_PERSON_NET_DEBT_LABEL: "এই ব্যক্তিকে আপনার দিতে হবে (মোট জের):",
-  NET_DEBT_BALANCE_ZERO_LABEL: "এই ব্যক্তির সাথে আপনার মোট জের শূন্য।",
-
-  VIEW_PERSON_LEDGER_TOOLTIP: "ব্যক্তির হিসাব দেখুন (খতিয়ান)",
-  ADD_LEDGER_ENTRY_MODAL_TITLE: "ব্যক্তির হিসাবে নতুন লেনদেন যোগ করুন",
-  PERSON_LEDGER_HISTORY_MODAL_TITLE: "{personName} এর হিসাবের বিবরণ (খতিয়ান)",
-  LEDGER_ENTRY_TYPE_LABEL: "লেনদেনের ধরণ (হিসাব)",
-  LEDGER_TYPE_CREDIT_PERSON: "জমা (ব্যক্তি টাকা দিয়েছেন বা দেনা কমিয়েছেন)", 
-  LEDGER_TYPE_DEBIT_PERSON: "খরচ (ব্যক্তি টাকা নিয়েছেন বা তার নামে খরচ লেখা হয়েছে)", 
-  LEDGER_BALANCE_AFTER_ENTRY: "এই লেনদেনের পর জের",
-  CURRENT_NET_LEDGER_BALANCE_LABEL: "বর্তমান নিট জের",
-  LEDGER_BALANCE_STATUS_DEBIT: "{amount} দেনা (পাওনা আছে)", 
-  LEDGER_BALANCE_STATUS_CREDIT: "{amount} জমা (দিতে হবে)", 
-  LEDGER_BALANCE_STATUS_ZERO: "হিসাব সমান",
-  ADD_LEDGER_ENTRY_BTN: "হিসাবে এন্ট্রি যোগ করুন",
-  NO_LEDGER_ENTRIES_FOUND: "এই ব্যক্তির জন্য এখনো কোনো হিসাবের এন্ট্রি নেই।",
-  CONFIRM_DELETE_LEDGER_ENTRY_MSG: "আপনি কি এই হিসাবের এন্ট্রিটি মুছে ফেলতে চান? এই কাজটি আর ফেরানো যাবে না। এর ফলে পরবর্তী জের প্রভাবিত হতে পারে।",
-  LEDGER_ENTRY_DELETED_SUCCESS: "হিসাবের এন্ট্রি সফলভাবে মোছা হয়েছে।",
-  LEDGER_ENTRY_ADDED_SUCCESS: "হিসাবে নতুন এন্ট্রি সফলভাবে যোগ করা হয়েছে।",
-  LEDGER_ENTRY_DESCRIPTION_PLACEHOLDER: "যেমন: নগদ প্রদান, মাল বাবদ খরচ",
-  LEDGER_ENTRIES_SECTION_TITLE: "হিসাবের এন্ট্রি (খতিয়ান)",
-  DEBTS_SECTION_TITLE: "দেনা-পাওনার তালিকা",
-  LEDGER_CREDIT_INCOME_DESC: "{personName} এর কাছ থেকে হিসাবে জমা: {description}", 
-  LEDGER_DEBIT_EXPENSE_DESC: "{personName} কে হিসাব থেকে প্রদান: {description}", 
-
-  PERSON_FINANCIAL_OVERVIEW_MODAL_TITLE: "{personName} এর সার্বিক আর্থিক বিবরণ",
-  VIEW_PERSON_FINANCIAL_OVERVIEW_TOOLTIP: "ব্যক্তির সার্বিক আর্থিক বিবরণ দেখুন",
-  UNIFIED_FINANCIAL_HISTORY_TITLE: "সার্বিক লেনদেন ও দেনা-পাওনার বিবরণ", 
-  NO_FINANCIAL_ACTIVITY: "এই ব্যক্তির জন্য এখনো কোনো আর্থিক কার্যকলাপ নেই।",
-
-  RECEIVABLE_PERSONS_MODAL_TITLE: "পাওনা আছে এমন ব্যক্তিদের তালিকা",
-  TOTAL_RECEIVABLE_FROM_PERSON_LABEL: "মোট পাওনা:",
-  NO_PERSONS_WITH_RECEIVABLES: "বর্তমানে কোনো ব্যক্তির কাছে আপনার কোনো পাওনা নেই।",
-  VIEW_DETAILS_FOR_PERSON_RECEIVABLE_TOOLTIP: "{personName} এর বিস্তারিত দেখুন",
-
-  PAYABLE_PERSONS_MODAL_TITLE: "পরিশোধ করতে হবে এমন ব্যক্তিদের তালিকা",
-  TOTAL_PAYABLE_TO_PERSON_LABEL: "মোট দেনা:",
-  NO_PERSONS_WITH_PAYABLES: "বর্তমানে আপনাকে কোনো ব্যক্তির কাছে টাকা পরিশোধ করতে হবে না।",
-  VIEW_DETAILS_FOR_PERSON_PAYABLE_TOOLTIP: "{personName} এর বিস্তারিত দেখুন",
-
-  REPORT_MODAL_TITLE: "আয়-ব্যয় রিপোর্ট",
-  SELECT_DATE_RANGE: "সময়সীমা নির্বাচন করুন:",
-  START_DATE: "শুরুর তারিখ",
-  END_DATE: "শেষের তারিখ",
-  GENERATE_REPORT_BTN: "রিপোর্ট জেনারেট করুন",
-  REPORT_FOR_PERIOD: "রিপোর্টের সময়সীমা:",
-  TO_DATE: "থেকে",
-  NET_BALANCE_FOR_PERIOD: "এই সময়ের নিট ব্যালেন্স:",
-  NO_TRANSACTIONS_IN_RANGE: "নির্বাচিত সময়সীমার মধ্যে কোনো লেনদেন পাওয়া যায়নি।",
-  REPORT_SUMMARY_TITLE: "সারসংক্ষেপ",
-  SELECT_DESCRIPTIONS_BTN_TEXT: "বিবরণ নির্বাচন করুন (ঐচ্ছিক)",
-  DESCRIPTIONS_SELECTED_COUNT_TEXT: "{count} টি বিবরণ নির্বাচিত",
-  SEARCH_DESCRIPTIONS_PLACEHOLDER: "বিবরণ খুঁজুন...",
-  CLEAR_SELECTION_BTN_TEXT: "নির্বাচন সাফ করুন",
-  REPORT_FOR_DESCRIPTIONS: "নির্বাচিত বিবরণের জন্য:",
-  NO_DESCRIPTIONS_AVAILABLE: "কোনো বিবরণ উপলব্ধ নেই।",
-  SELECT_ALL_VISIBLE_DESCRIPTIONS_LABEL: "দৃশ্যমান সবগুলো নির্বাচন করুন",
-  DESELECT_ALL_VISIBLE_DESCRIPTIONS_LABEL: "দৃশ্যমান সবগুলো অনির্বাচিত করুন",
-
-  MANAGE_SUGGESTIONS_MODAL_TITLE: "বিবরণ পরামর্শ তালিকা পরিচালনা করুন",
-  MANAGE_SUGGESTIONS_BTN_TEXT: "পরামর্শ তালিকা পরিচালনা করুন",
-  SUGGESTIONS_INCOME_TAB: "আয়ের বিবরণী",
-  SUGGESTIONS_EXPENSE_TAB: "ব্যয়ের বিবরণী",
-  ADD_NEW_SUGGESTION_LABEL: "নতুন পরামর্শ যোগ করুন:",
-  ADD_SUGGESTION_BTN: "পরামর্শ যোগ করুন",
-  SUGGESTION_PLACEHOLDER: "যেমন: সন্তানের খেলনা",
-  USER_SUGGESTIONS_TITLE_INCOME: "আপনার নিজস্ব আয়ের পরামর্শ:",
-  USER_SUGGESTIONS_TITLE_EXPENSE: "আপনার নিজস্ব ব্যয়ের পরামর্শ:",
-  PREDEFINED_SUGGESTIONS_TITLE_INCOME: "পূর্বনির্ধারিত আয়ের পরামর্শ (শুধু দেখার জন্য):",
-  PREDEFINED_SUGGESTIONS_TITLE_EXPENSE: "পূর্বনির্ধারিত ব্যয়ের পরামর্শ (শুধু দেখার জন্য):",
-  NO_USER_SUGGESTIONS_FOR_TYPE: "আপনি এই ধরণের জন্য এখনো কোনো নিজস্ব পরামর্শ যোগ করেননি।",
-  EDIT_SUGGESTION_TOOLTIP: "পরামর্শ সম্পাদনা করুন",
-  DELETE_SUGGESTION_TOOLTIP: "পরামর্শ মুছুন",
-  CONFIRM_DELETE_SUGGESTION_MSG: "আপনি কি এই পরামর্শটি মুছতে চান?",
-  SUGGESTION_ADDED_SUCCESS: "পরামর্শ সফলভাবে যোগ করা হয়েছে।",
-  SUGGESTION_UPDATED_SUCCESS: "পরামর্শ সফলভাবে আপডেট করা হয়েছে।",
-  SUGGESTION_DELETED_SUCCESS: "পরামর্শ সফলভাবে মোছা হয়েছে।",
-  SUGGESTION_EXISTS_ERROR: "এই পরামর্শটি ইতিমধ্যে বিদ্যমান অথবা খালি।",
-  SUGGESTION_CANNOT_BE_EMPTY: "পরামর্শ খালি রাখা যাবে না।",
-  SUGGESTION_ALREADY_EXISTS: "এই নামে একটি পরামর্শ ইতিমধ্যে বিদ্যমান।",
-  EDIT_SUGGESTION_MODAL_TITLE: "পরামর্শ সম্পাদনা করুন", 
-  SELECT_ALL_SUGGESTIONS_LABEL: "সবগুলো নির্বাচন করুন",
-  DESELECT_ALL_SUGGESTIONS_LABEL: "সবগুলো অনির্বাচিত করুন",
-
-  FORGOT_PASSWORD_LINK: "পাসওয়ার্ড ভুলে গেছেন?",
-  FORGOT_PASSWORD_TITLE: "পাসওয়ার্ড পুনরুদ্ধার",
-  FORGOT_PASSWORD_INSTRUCTIONS: "আপনার অ্যাকাউন্টের সাথে যুক্ত ইমেইলটি লিখুন। আমরা আপনাকে পাসওয়ার্ড পুনরায় সেট করার জন্য একটি কোড পাঠাব।",
-  SEND_RESET_CODE_BTN: "রিসেট কোড পাঠান",
-  RESET_CODE_SENT_SUCCESS: "যদি আপনার ইমেইলটি আমাদের সিস্টেমে থাকে, তাহলে একটি রিসেট কোড পাঠানো হয়েছে। কোডটি আপনার ইমেইলে দেখুন।",
-  RESET_CODE_SENT_FAIL: "রিসেট কোড পাঠাতে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।",
-  RESET_CODE_LABEL: "রিসেট কোড",
-  RESET_CODE_PLACEHOLDER: "ইমেইল থেকে প্রাপ্ত কোড",
-  NEW_PASSWORD_LABEL: "নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)",
-  CONFIRM_NEW_PASSWORD_LABEL: "নতুন পাসওয়ার্ড নিশ্চিত করুন",
-  RESET_PASSWORD_BTN: "পাসওয়ার্ড পরিবর্তন করুন",
-  PASSWORD_RESET_SUCCESS_AUTO_LOGIN: "আপনার পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে এবং আপনি এখন লগইন অবস্থায় আছেন।", 
-  PASSWORDS_DONT_MATCH: "নতুন পাসওয়ার্ড এবং নিশ্চিতকরণ পাসওয়ার্ড মেলেনি।",
-  INVALID_RESET_CODE: "রিসেট কোডটি সঠিক নয় অথবা মেয়াদ উত্তীর্ণ হয়ে গেছে।",
-  EMAIL_NOT_FOUND_ALERT: "এই ইমেইল ঠিকানাটি আমাদের সিস্টেমে খুঁজে পাওয়া যায়নি।",
-  RESET_CODE_EMAIL_SUBJECT: "পাসওয়ার্ড রিসেট কোড",
-  RESET_CODE_EMAIL_MESSAGE_HTML: `
-    <div style="font-family: Arial, sans-serif; color: #333;">
-      <p>প্রিয় ব্যবহারকারী,</p>
-      <p>আপনার পাসওয়ার্ড রিসেট করার জন্য অনুরোধ করা হয়েছে। আপনার এককালীন রিসেট কোড হলো:</p>
-      <p style="font-size: 24px; font-weight: bold; color: #007bff; letter-spacing: 2px; border: 1px dashed #007bff; padding: 10px; display: inline-block;">
-        {CODE}
-      </p>
-      <p>এই কোডটি অল্প সময়ের জন্য সক্রিয় থাকবে। আপনি যদি এই অনুরোধ না করে থাকেন, তাহলে এই ইমেইলটি উপেক্ষা করুন।</p>
-      <p>ধন্যবাদ,<br/>{APP_TITLE} টিম</p>
-    </div>
-  `.trim(),
-  PASSWORD_CHANGED_EMAIL_SUBJECT: "আপনার অ্যাকাউন্টের পাসওয়ার্ড পরিবর্তিত হয়েছে", 
-  PASSWORD_CHANGED_EMAIL_MESSAGE_HTML: `
-    <div style="font-family: Arial, sans-serif; color: #333;">
-      <p>প্রিয় {USER_NAME},</p>
-      <p>আপনার {APP_TITLE} অ্যাকাউন্টের পাসওয়ার্ড সম্প্রতি পরিবর্তন করা হয়েছে।</p>
-      <p>আপনি যদি এই পরিবর্তন না করে থাকেন, অনুগ্রহ করে অবিলম্বে আমাদের সাথে যোগাযোগ করুন।</p>
-      <p>ধন্যবাদ,<br/>{APP_TITLE} টিম</p>
-    </div>
-  `.trim(),
-  RESET_CODE_EMAIL_BODY_INTRO: "প্রিয় {userName},", 
-  RESET_CODE_EMAIL_BODY_REQUEST_INFO: "আপনি আপনার {appName} অ্যাকাউন্টের জন্য পাসওয়ার্ড রিসেট করার অনুরোধ করেছেন।",
-  RESET_CODE_EMAIL_BODY_CODE_INFO: "আপনার পাসওয়ার্ড রিসেট কোড হলো: ", 
-  RESET_CODE_EMAIL_BODY_EXPIRY_INFO: "এই কোডটি ১০ মিনিটের জন্য সক্রিয় থাকবে।",
-  RESET_CODE_EMAIL_BODY_IGNORE_INFO: "আপনি যদি এই অনুরোধ না করে থাকেন, তাহলে এই ইমেইলটি উপেক্ষা করুন।",
-  RESET_CODE_EMAIL_BODY_THANKS: "ধন্যবাদ,",
-  RESET_CODE_EMAIL_BODY_TEAM_NAME: "{appName} টিম",
-  BACK_TO_LOGIN_LINK: "লগইনে ফিরে যান",
-  REMEMBER_ME: "আমা‌কে ম‌নে রে‌খো",
-
-  ITEM_ARCHIVED: "আইটেমটি আর্কাইভ করা হয়েছে।",
-  STATUS_ARCHIVED: "আর্কাইভ করা হয়েছে",
-  DELETED_ON: "সরানো হয়েছে:",
-  SHOW_DELETED_ITEMS_BTN: "সরানো আইটেম দেখুন",
-  HIDE_DELETED_ITEMS_BTN: "সরানো আইটেম লুকান",
-  RESTORE_ITEM_TOOLTIP: "আইটেম পুনরুদ্ধার করুন",
-  ITEM_RESTORED_SUCCESS: "আইটেম সফলভাবে পুনরুদ্ধার করা হয়েছে।",
-  PERSON_RESTORED_SUCCESS: "ব্যক্তি সফলভাবে পুনরুদ্ধার করা হয়েছে।",
-  CONFIRM_RESTORE_TRANSACTION_MSG: "আপনি কি এই লেনদেনটি পুনরুদ্ধার করতে চান?",
-  CONFIRM_RESTORE_PERSON_MSG: "আপনি কি এই ব্যক্তিকে পুনরুদ্ধার করতে চান?",
-  NO_DELETED_TRANSACTIONS: "কোনো মোছা লেনদেন নেই।",
-  NO_DELETED_PERSONS: "কোনো মোছা ব্যক্তি নেই।",
-
-  ARCHIVE_MODAL_TITLE: "আর্কাইভ (সরানো আইটেমসমূহ)",
-  DELETED_TRANSACTIONS_TAB: "সরানো লেনদেন",
-  DELETED_PERSONS_TAB: "সরানো ব্যক্তি",
-  ARCHIVE_NAV_BTN: "আর্কাইভ",
-
-  MODAL_TITLE_CONFIRM_DELETE: "মোছার বিষয়টি নিশ্চিত করুন",
-  CONFIRM_BTN_YES_DELETE: "হ্যাঁ, মুছুন",
-  CONFIRM_BTN_YES_RESTORE: "হ্যাঁ, পুনরুদ্ধার করুন",
-
-  BUDGET_MANAGEMENT_TITLE: "বাজেট ব্যবস্থাপনা",
-  BUDGET_SETUP_MODAL_TITLE: "বাজেট সেটআপ ও ট্র্যাকিং",
-  BUDGET_CATEGORIES_SECTION_TITLE: "বাজেট ক্যাটেগরি সমূহ",
-  ADD_NEW_BUDGET_CATEGORY_BTN: "নতুন ক্যাটেগরি যোগ করুন",
-  EDIT_BUDGET_CATEGORY_BTN: "ক্যাটেগরি সম্পাদনা করুন",
-  DELETE_BUDGET_CATEGORY_BTN: "ক্যাটেগরি মুছুন",
-  BUDGET_CATEGORY_NAME_LABEL: "ক্যাটেগরির নাম",
-  BUDGET_CATEGORY_NAME_PLACEHOLDER: "যেমন: খাবার খরচ, যাতায়াত",
-  SAVE_BUDGET_CATEGORY_BTN: "ক্যাটেগরি সংরক্ষণ করুন",
-  NO_BUDGET_CATEGORIES_FOUND: "এখনও কোনো বাজেট ক্যাটেগরি তৈরি করা হয়নি।",
-  CONFIRM_DELETE_BUDGET_CATEGORY_MSG: "আপনি কি এই বাজেট ক্যাটেগরিটি মুছে ফেলতে চান? এর সাথে সম্পর্কিত সকল বাজেটও মুছে যাবে।",
-  BUDGET_CATEGORY_ADDED_SUCCESS: "বাজেট ক্যাটেগরি সফলভাবে যোগ করা হয়েছে।",
-  BUDGET_CATEGORY_UPDATED_SUCCESS: "বাজেট ক্যাটেগরি সফলভাবে আপডেট করা হয়েছে।",
-  BUDGET_CATEGORY_DELETED_SUCCESS: "বাজেট ক্যাটেগরি সফলভাবে মুছে ফেলা হয়েছে।",
-  BUDGET_CATEGORY_NAME_REQUIRED: "ক্যাটেগরির নাম আবশ্যক।",
-  BUDGET_CATEGORY_EXISTS_ERROR: "এই নামে ইতিমধ্যে একটি ক্যাটেগরি আছে।",
-  BUDGET_CATEGORY_HAS_BUDGETS_ERROR: "এই ক্যাটেগরির অধীনে বাজেট রয়েছে। প্রথমে বাজেটগুলো মুছুন অথবা অন্য ক্যাটেগরিতে স্থানান্তর করুন।",
-
-  BUDGETS_SECTION_TITLE: "বাজেট সমূহ",
-  ADD_NEW_BUDGET_BTN: "নতুন বাজেট তৈরি করুন",
-  EDIT_BUDGET_BTN: "বাজেট সম্পাদনা করুন",
-  DELETE_BUDGET_BTN: "বাজেট মুছুন",
-  SELECT_BUDGET_CATEGORY_LABEL: "বাজেট ক্যাটেগরি নির্বাচন করুন",
-  BUDGET_AMOUNT_LABEL: "বাজেটের পরিমাণ",
-  BUDGET_PERIOD_LABEL: "সময়কাল",
-  BUDGET_START_MONTH_LABEL: "শুরুর মাস",
-  BUDGET_START_WEEK_LABEL: "শুরুর সপ্তাহ (বছর, সপ্তাহ নং)",
-  BUDGET_START_QUARTER_LABEL: "শুরুর ত্রৈমাসিক (বছর, ত্রৈমাসিক)",
-  BUDGET_START_YEAR_LABEL: "বছর",
-  BUDGET_CUSTOM_START_DATE_LABEL: "শুরুর তারিখ (কাস্টম)",
-  BUDGET_CUSTOM_END_DATE_LABEL: "শেষ তারিখ (কাস্টম)",
-  BUDGET_MONTHLY_PERIOD: "মাসিক",
-  BUDGET_WEEKLY_PERIOD: "সাপ্তাহিক",
-  BUDGET_QUARTERLY_PERIOD: "ত্রৈমাসিক",
-  BUDGET_YEARLY_PERIOD: "বার্ষিক",
-  BUDGET_CUSTOM_PERIOD_LABEL: "কাস্টম সময়সীমা",
-  QUARTER_1: "প্রথম ত্রৈমাসিক (জান-মার্চ)",
-  QUARTER_2: "দ্বিতীয় ত্রৈমাসিক (এপ্রিল-জুন)",
-  QUARTER_3: "তৃতীয় ত্রৈমাসিক (জুলাই-সেপ্ট)",
-  QUARTER_4: "চতুর্থ ত্রৈমাসিক (অক্টো-ডিসে)",
-
-  SAVE_BUDGET_BTN: "বাজেট সংরক্ষণ করুন",
-  NO_BUDGETS_FOUND: "এখনও কোনো বাজেট তৈরি করা হয়নি।",
-  CONFIRM_DELETE_BUDGET_MSG: "আপনি কি এই বাজেটটি মুছে ফেলতে চান?",
-  BUDGET_ADDED_SUCCESS: "বাজেট সফলভাবে তৈরি করা হয়েছে।",
-  BUDGET_UPDATED_SUCCESS: "বাজেট সফলভাবে আপডেট করা হয়েছে।",
-  BUDGET_DELETED_SUCCESS: "বাজেট সফলভাবে মুছে ফেলা হয়েছে।",
-  BUDGET_SELECT_CATEGORY_PLACEHOLDER: "-- ক্যাটেগরি নির্বাচন করুন --",
-  BUDGET_FOR_PERIOD_LABEL: "{periodDisplay} এর জন্য বাজেট", 
-  BUDGET_SPENT_LABEL: "খরচ হয়েছে",
-  BUDGET_REMAINING_LABEL: "অবশিষ্ট",
-  BUDGET_PERCENTAGE_USED_LABEL: "{percentage}% ব্যবহৃত",
-  BUDGET_OVERSPENT_LABEL: "অতিরিক্ত খরচ",
-  BUDGET_TARGET_LABEL: "লক্ষ্য",
-  BUDGET_EXISTS_FOR_CATEGORY_MONTH_ERROR: "নির্বাচিত সময়কাল এবং ক্যাটেগরির জন্য ইতিমধ্যে একটি বাজেট আছে।",
-  BUDGET_INVALID_START_DATE: "অনুগ্রহ করে একটি সঠিক শুরুর সময়কাল নির্বাচন করুন।",
-  BUDGET_INVALID_CUSTOM_DATE_RANGE: "কাস্টম সময়সীমার জন্য শেষের তারিখ শুরুর তারিখের পরে হতে হবে।",
-  BUDGET_INVALID_AMOUNT: "অনুগ্রহ করে একটি সঠিক বাজেট পরিমাণ লিখুন।",
-  BUDGET_CATEGORY_NOT_SELECTED: "অনুগ্রহ করে একটি বাজেট ক্যাটেগরি নির্বাচন করুন।",
-  MANAGE_BUDGETS_NAV_BTN: "বাজেট",
-
-  WELCOME_TO_APP_MAIN_TITLE: "অ্যাপে স্বাগতম!",
-  WELCOME_TO_APP_SUBTITLE: "আপনার দৈনন্দিন আয় এবং ব্যয়ের হিসাব সহজে ট্র্যাক করুন এবং আর্থিক ভাবে আরও منظم হোন।",
-  KEY_FEATURES_TITLE: "আমাদের প্রধান বৈশিষ্ট্যসমূহ:",
-  FEATURE_TRANSACTION_TRACKING_TITLE: "দৈনিক আয়-ব্যয় ট্র্যাকিং",
-  FEATURE_TRANSACTION_TRACKING_DESC: "সহজেই আপনার প্রতিদিনের আয় এবং ব্যয় রেকর্ড করুন।",
-  FEATURE_DEBT_MANAGEMENT_TITLE: "ধার-দেনা ব্যবস্থাপনা",
-  FEATURE_DEBT_MANAGEMENT_DESC: "কার কাছে কত পাবেন বা কাকে কত দিতে হবে, তার হিসাব রাখুন।",
-  FEATURE_PERSON_LEDGER_TITLE: "ব্যক্তিভিত্তিক খতিয়ান",
-  FEATURE_PERSON_LEDGER_DESC: "প্রতি ব্যক্তির সাথে আপনার লেনদেনের বিস্তারিত হিসাব দেখুন।",
-  FEATURE_BUDGETING_TITLE: "বাজেট তৈরি ও ট্র্যাকিং",
-  FEATURE_BUDGETING_DESC: "মাসিক বা কাস্টম বাজেট তৈরি করুন এবং খরচ ট্র্যাক করুন।",
-  FEATURE_REPORTS_TITLE: "বিস্তারিত রিপোর্ট",
-  FEATURE_REPORTS_DESC: "নির্দিষ্ট সময়সীমার জন্য আয়-ব্যয়ের রিপোর্ট দেখুন।",
-  FEATURE_AI_ADVICE_TITLE: "AI আর্থিক পরামর্শ",
-  FEATURE_AI_ADVICE_DESC: "আপনার আর্থিক অবস্থার উপর ভিত্তি করে Gemini AI থেকে পরামর্শ পান।" ,
-
-  CHANGE_PASSWORD_MODAL_TITLE: "পাসওয়ার্ড পরিবর্তন করুন",
-  CURRENT_PASSWORD_LABEL: "বর্তমান পাসওয়ার্ড",
-  ERROR_CURRENT_PASSWORD_INCORRECT: "আপনার বর্তমান পাসওয়ার্ড সঠিক নয়।",
-  PASSWORD_CHANGE_SUCCESS: "আপনার পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে।",
-
-  EDIT_PROFILE_MODAL_TITLE: "প্রোফাইল সম্পাদনা করুন",
-  EDIT_PROFILE_NAV_BTN_TEXT: "প্রোফাইল",
-  EMAIL_NOT_EDITABLE: "ইমেইল (পরিবর্তনযোগ্য নয়)",
-  PROFILE_UPDATE_SUCCESS: "আপনার প্রোফাইল সফলভাবে আপডেট করা হয়েছে।",
-  MOBILE_NUMBER_ALREADY_IN_USE: "এই মোবাইল নম্বরটি ({mobileNumber}) অন্য কোনো ব্যবহারকারী ব্যবহার করছেন। অনুগ্রহ করে একটি ভিন্ন মোবাইল নম্বর দিন।",
-  INVALID_MOBILE_NUMBER_FORMAT: "অনুগ্রহ করে একটি সঠিক বাংলাদেশী মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)।",
-  FACEBOOK_PROFILE_URL: "ফেসবুক প্রোফাইল ইউআরএল (ঐচ্ছিক)",
-  FACEBOOK_PROFILE_URL_PLACEHOLDER: "https://facebook.com/yourprofile",
-  INVALID_FACEBOOK_URL: "অনুগ্রহ করে একটি সঠিক ফেসবুক প্রোফাইল ইউআরএল দিন।",
-
-  CHAT_WITH_PERSON_TITLE: "{personName} এর সাথে চ্যাট",
-  TYPE_YOUR_MESSAGE: "আপনার বার্তা লিখুন...",
-  SEND_MESSAGE_BTN: "বার্তা পাঠান",
-  NO_MESSAGES_YET: "{personName} এর সাথে এখনো কোনো বার্তা আদান-প্রদান হয়নি।",
-  MESSAGE_SENT_SUCCESS: "বার্তা সফলভাবে পাঠানো হয়েছে।",
-  MESSAGE_SEND_ERROR: "বার্তা পাঠাতে সমস্যা হয়েছে।",
-  MESSAGE_FROM_YOU: "আপনি",
-  OPEN_CHAT_TOOLTIP: "{personName} এর সাথে চ্যাট করুন",
-  CHAT_NOT_AVAILABLE_FOR_NON_REGISTERED_PERSON: "{personName} একজন রেজিস্টার্ড ব্যবহারকারী নন, তাই তার সাথে চ্যাট করা যাবে না।",
-  INBOX_MODAL_TITLE: "বার্তা ইনবক্স",
-  NO_INCOMING_MESSAGES: "আপনার জন্য কোনো নতুন বার্তা নেই।",
-  VIEW_CHAT_HISTORY_WITH_PERSON: "{personName} এর সাথে চ্যাট দেখুন",
-  UNREAD_MESSAGES_FROM_PERSON: "{personName} এর কাছ থেকে অপঠিত বার্তা",
-  LAST_MESSAGE_FROM: "শেষ বার্তা ({personName} থেকে):",
-  LAST_MESSAGE_TO: "শেষ বার্তা ({personName} এর কাছে):",
-  MESSAGES_NAV_BTN: "ইনবক্স",
-  MESSAGE_FAILED_TO_MARK_AS_READ: "বার্তাগুলি পড়া হিসাবে চিহ্নিত করতে সমস্যা হয়েছে।",
-  ATTACH_IMAGE_TOOLTIP: "ছবি সংযুক্ত করুন",
-  EMOJI_PICKER_TOOLTIP: "ইমোজি নির্বাচন করুন",
-  IMAGE_PREVIEW_CHAT_ALT: "সংযুক্ত ছবির প্রিভিউ", 
-  IMAGE_SEND_ERROR: "ছবি পাঠাতে সমস্যা হয়েছে।",
-  INVALID_IMAGE_FILE: "অবৈধ ছবি ফাইল। শুধুমাত্র PNG, JPG, GIF অনুমোদিত।",
-  IMAGE_TOO_LARGE_CHAT: "ছবির আকার 2MB এর বেশি হতে পারবে না।",
-  ADD_REACTION_TOOLTIP: "প্রতিক্রিয়া যোগ করুন",
-  MESSAGE_REACTION_ERROR: "বার্তায় প্রতিক্রিয়া জানাতে সমস্যা হয়েছে।",
-  IMAGE_VIEWER_TITLE: "ছবি দেখুন", 
-  DOWNLOAD_IMAGE_BTN: "ছবি ডাউনলোড করুন",
-  CONFIRM_DELETE_MESSAGE_MSG: "আপনি কি এই বার্তাটি মুছে ফেলতে চান? এই কাজটি ফেরানো যাবে না।",
-  MESSAGE_DELETED_SUCCESS: "বার্তা সফলভাবে মোছা হয়েছে।",
-  MESSAGE_DELETE_ERROR: "বার্তা মুছতে সমস্যা হয়েছে।",
-  DELETE_MESSAGE_TOOLTIP: "বার্তা মুছুন",
-  YOU_DELETED_A_MESSAGE: "আপনি এই বার্তাটি মুছে ফেলেছেন",
-  MESSAGE_WAS_DELETED: "এই বার্তাটি মোছা হয়েছে",
-  DELETE_CHAT_HISTORY_TOOLTIP: "চ্যাট ইতিহাস মুছুন",
-  CONFIRM_DELETE_CHAT_HISTORY_MSG: "আপনি কি নিশ্চিত যে আপনি {personName} এর সাথে আপনার সমস্ত বার্তা মুছে ফেলতে চান? এই কাজটি শুধুমাত্র আপনার দিক থেকে বার্তাগুলি সরাবে এবং এটি ফেরানো যাবে না।",
-  MESSAGE_ACTION_HISTORY_DELETED: "ইতিহাস মোছা হয়েছে",
-  CHAT_HISTORY_DELETED_SUCCESS: "চ্যাট ইতিহাস সফলভাবে মোছা হয়েছে।",
-  
-  RECORD_VOICE_TOOLTIP: "ভয়েস রেকর্ড করুন",
-  STOP_RECORDING_TOOLTIP: "রেকর্ডিং বন্ধ করুন",
-  AUDIO_PREVIEW_LABEL: "অডিও প্রিভিউ",
-  REMOVE_AUDIO_PREVIEW_TOOLTIP: "অডিও সরান",
-  AUDIO_MESSAGE_LABEL: "[অডিও বার্তা]",
-  MAX_RECORDING_DURATION_REACHED: "সর্বোচ্চ রেকর্ডিং সময়সীমা অতিক্রান্ত হয়েছে।",
-  ERROR_AUDIO_RECORDING: "অডিও রেকর্ড করতে সমস্যা হয়েছে।",
-  RECORDING_LABEL: "রেকর্ডিং:",
-  AUDIO_SEND_ERROR: "অডিও পাঠাতে সমস্যা হয়েছে।",
-
-  VIDEO_CALL_WITH_PERSON_TITLE: "{personName} এর সাথে ভিডিও কল",
-  LOCAL_VIDEO_PREVIEW_ARIA: "আপনার লোকাল ভিডিও প্রিভিউ",
-  REMOTE_VIDEO_ARIA: "রিমোট ভিডিও",
-  MUTE_MIC_BTN: "মাইক্রোফোন মিউট করুন",
-  UNMUTE_MIC_BTN: "মাইক্রোফোন আনমিউট করুন",
-  START_VIDEO_BTN: "ভিডিও চালু করুন",
-  STOP_VIDEO_BTN: "ভিডিও বন্ধ করুন",
-  END_CALL_BTN: "কল শেষ করুন",
-  VIDEO_CALL_PERMISSION_ERROR: "ভিডিও কলের জন্য ক্যামেরা এবং মাইক্রোফোনের অনুমতি প্রয়োজন। অনুগ্রহ করে অনুমতি দিন।",
-  VIDEO_CALL_DEVICE_ERROR: "ক্যামেরা বা মাইক্রোফোন চালু করতে সমস্যা হয়েছে। ডিভাইস সংযুক্ত আছে কিনা পরীক্ষা করুন।",
-  WAITING_FOR_PERSON_VIDEO: "{personName} এর জন্য অপেক্ষা করা হচ্ছে...",
-  OPEN_VIDEO_CALL_TOOLTIP: "{personName} এর সাথে ভিডিও কল করুন",
-  VIDEO_CALL_NOT_AVAILABLE_FOR_NON_REGISTERED_PERSON: "{personName} একজন রেজিস্টার্ড ব্যবহারকারী নন, তাই তার সাথে ভিডিও কল করা যাবে না।",
-  CONNECTING_VIDEO_CALL: "সংযোগ করা হচ্ছে...",
-
-  QUANTITY_LABEL: "পরিমাণ (সংখ্যা)",
-  UNIT_LABEL: "একক",
-  ADDITIONAL_NOTES_LABEL: "অতিরিক্ত বিবরণ (ঐচ্ছিক)",
-  UNIT_PLACEHOLDER: "যেমন: কেজি, পিস",
-  ADDITIONAL_NOTES_PLACEHOLDER: "কোনো বিশেষ দ্রষ্টব্য...",
-  FIELD_REQUIRED_TOGGLE: "আবশ্যক",
-  FIELD_IS_REQUIRED: "আবশ্যক",
-
-  PHONETIC_TYPING_TOGGLE_TOOLTIP: "ফোনেটিক বাংলা/ইংরেজি টাইপিং পরিবর্তন করুন",
-  PHONETIC_BANGLA_ACTIVE: "ফোনেটিক বাংলা সক্রিয়",
-  PHONETIC_ENGLISH_ACTIVE: "ইংরেজি টাইপিং সক্রিয়",
-};
-
-export const GEMINI_MODEL_TEXT = "gemini-2.5-flash-preview-04-17";
+export const GEMINI_MODEL_TEXT = "gemini-2.5-flash-preview-04-17"; // Default, will be overridden by user settings
 export const GEMINI_PROMPT_LANG = "Bengali";
 export const APP_TITLE_FOR_EMAIL = BN_UI_TEXT.APP_TITLE;
+export const ADMIN_EMAIL = 'shadik.netmow@gmail.com'; // Admin email
+
+export const DEFAULT_GEMINI_SETTINGS = {
+  model: 'gemini-2.5-flash-preview-04-17',
+  temperature: 1,
+  topK: 64,
+  topP: 0.95,
+};
 
 export const LOCAL_STORAGE_KEYS = {
   TRANSACTIONS: 'transactions_v5_api_backed', 
@@ -557,10 +24,48 @@ export const LOCAL_STORAGE_KEYS = {
   USER_TRANSACTION_SUGGESTIONS: 'user_transaction_suggestions_v2_api_backed',
   BUDGET_CATEGORIES: 'budget_categories_v1_api_backed',
   BUDGETS: 'budgets_v1_api_backed',
-  MESSAGES: 'messages_v2_api_backed', 
+  MESSAGES: 'messages_v2_api_backed',
+  INVOICES: 'invoices_v1_api_backed',
+  PRODUCTS: 'products_v1_api_backed',
+  COMPANY_PROFILES: 'company_profiles_v1_api_backed', 
+  BANK_ACCOUNTS: 'bank_accounts_v1_api_backed', // New key for Bank Accounts
   REMEMBER_USER: 'rememberUserPreference_v1',
+  REMEMBERED_EMAIL_OR_MOBILE: 'rememberedEmailOrMobile_v1',
+  REMEMBERED_PASSWORD: 'rememberedPassword_v1', // New key for remembered password
   EXPENSE_FIELD_REQUIREMENTS: 'expense_field_requirements_v1',
-  GLOBAL_PHONETIC_MODE: 'global_phonetic_mode_v1', // Added new key
+  GLOBAL_PHONETIC_MODE: 'global_phonetic_mode_v1',
+  INVOICE_GLOBAL_PRICE_TYPE: 'invoice_global_price_type_v1',
+  GEMINI_SETTINGS: 'gemini_settings_v1', // New key for Gemini settings
+  AI_ASSISTANT_LOGS: 'aiAssistantLogs_v1', // New key for AI Assistant logs
+  AI_VOICE_REPLAY_ENABLED: 'aiVoiceReplayEnabled_v1', // New key for AI voice replay setting
+  AI_ASSISTANT_SCOPE: 'aiAssistantScope_v1', // New key for AI assistant scope
+  DEFAULT_BANK_ACCOUNT_ID: 'defaultBankAccountId_v1', // New key for Default Bank Account ID
+  
+  // Pin keys for Sales Invoice
+  PIN_SALES_INVOICE_PAYMENT_STATUS: 'pin_sales_invoice_payment_status_v1',
+  PIN_SALES_INVOICE_DATE: 'pin_sales_invoice_date_v1',
+  PIN_SALES_DUE_DATE: 'pin_sales_due_date_v1',
+  PIN_SALES_COMPANY_PROFILE: 'pin_sales_company_profile_v1',
+  PIN_SALES_DISCOUNT_TYPE: 'pin_sales_discount_type_v1',
+  PIN_SALES_TAX_TYPE: 'pin_sales_tax_type_v1',
+  PIN_SALES_PAYMENT_METHOD: 'pin_sales_payment_method_v1',
+  PIN_SALES_PAYMENT_NOTES: 'pin_sales_payment_notes_v1',
+  PIN_SALES_INVOICE_NOTES: 'pin_sales_invoice_notes_v1',
+
+  // Pin keys for Purchase Bill
+  PIN_PURCHASE_BILL_DATE: 'pin_purchase_bill_date_v1',
+  PIN_PURCHASE_DUE_DATE: 'pin_purchase_due_date_v1',
+  PIN_PURCHASE_COMPANY_PROFILE: 'pin_purchase_company_profile_v1',
+  PIN_PURCHASE_DISCOUNT_TYPE: 'pin_purchase_discount_type_v1',
+  PIN_PURCHASE_TAX_TYPE: 'pin_purchase_tax_type_v1',
+
+  // Column visibility keys
+  INVOICE_COLUMN_VISIBILITY_SALES_V1: 'invoiceColumnVisibility_sales_v1',
+  INVOICE_COLUMN_VISIBILITY_PURCHASE_V1: 'invoiceColumnVisibility_purchase_v1',
+
+  // Item section font size keys
+  INVOICE_ITEM_FONT_SIZE_SALES_V1: 'invoiceItemFontSize_sales_v1',
+  INVOICE_ITEM_FONT_SIZE_PURCHASE_V1: 'invoiceItemFontSize_purchase_v1',
 };
 
 export const INCOME_DESCRIPTION_SUGGESTIONS_BN = [
@@ -622,6 +127,7 @@ export const CHAT_AUDIO_MAX_DURATION_MS = 60 * 1000;
 export const PREFERRED_AUDIO_MIME_TYPE = 'audio/webm'; 
 export const EMOJI_LIST = ['😀', '😂', '😊', '😍', '🤔', '👍', '🙏', '❤️', '🎉', '🥳', '😢', '😠', '🔥', '💡', '☀️', '🌙', '🍕', '✈️', '🎈', '⚽'];
 export const REACTION_EMOJI_LIST = ['👍', '❤️', '😂', '😮', '😢', '🙏', '😠'];
+export const PRODUCT_IMAGE_MAX_SIZE_BYTES = 512 * 1024; // 512KB for product images
 
 export const COMMON_UNITS_BN = [
   "পিস", "কেজি", "গ্রাম", "লিটার", "এমএল", "মিটার", "ফুট", "ইঞ্চি", "বর্গফুট", "বর্গমিটার",
@@ -647,53 +153,47 @@ export const EXPENSE_TO_UNIT_MAP_BN: { [key: string]: string } = {
   "কাঠ": "সিএফটি", // ঘনফুট
   "ঔষধ": "পাতা", // Or "পিস", "বোতল"
   "সাবান": "পিস", "শ্যাম্পু": "বোতল",
-  "सिगरेट": "প্যাকেট", "সিগারেট": "পিস",
+  "সিগারেট": "পিস", // Corrected from "सिগरेट" - Kept the "পিস" version
   "মোবাইল রিচার্জ": "টাকা", // This is more of a category than item with unit
   "বিদ্যুৎ": "ইউনিট", // kilowatt-hour
   "গ্যাস": "ঘনমিটার", // Or "সিলিন্ডার" (পিস)
 };
 
-// Simplified phonetic map for Bangla typing simulation
 export const PHONETIC_MAP_BN: { [key: string]: string } = {
   'k': 'ক', 'kh': 'খ', 'g': 'গ', 'gh': 'ঘ', 'ng': 'ঙ',
-  'c': 'চ', 'ch': 'চ', // ch for চ is common
-  'Ch': 'ছ', 'chh': 'ছ', // Ch or chh for ছ
-  'j': 'জ', 'jh': 'ঝ', 'z': 'ঝ', // jh or z for ঝ
-  'NG': 'ঞ', // Special for ঞ (often using capital for distinction)
+  'c': 'চ', 'ch': 'চ', 
+  'Ch': 'ছ', 'chh': 'ছ', 
+  'j': 'জ', 'jh': 'ঝ', 'z': 'ঝ', 
+  'NG': 'ঞ', 
   'T': 'ট', 'Th': 'ঠ', 'D': 'ড', 'Dh': 'ঢ', 'N': 'ণ',
   't': 'ত', 'th': 'থ', 'd': 'দ', 'dh': 'ধ', 'n': 'ন',
-  'p': 'প', 'f': 'ফ', 'ph': 'ফ', // f or ph for ফ
-  'b': 'ব', 'bh': 'ভ', 'v': 'ভ', // bh or v for ভ
+  'p': 'প', 'f': 'ফ', 'ph': 'ফ', 
+  'b': 'ব', 'bh': 'ভ', 'v': 'ভ', 
   'm': 'ম',
-  'y': 'য়', 'Y': 'য়', // अंतস্থ य
-  'J': 'য', // Often for য in Avro keyboard (distinguished from 'j' for জ)
-  'r': 'র', 'R': 'র', // R for ড়/ঢ় might be needed depending on full phonetic system
+  'y': 'য়', 'Y': 'য়', 
+  'J': 'য', 
+  'r': 'র', 'R': 'র', 
   'l': 'ল',
-  's': 'স', // Added 's' mapping to 'স'
-  'S': 'স', 'sh': 'শ',  // S for স is common, sh for শ
-  'Sh': 'ষ', // Often capital for ষ (distinguished from sh for শ)
+  's': 'স', 
+  'S': 'স', 'sh': 'শ',  
+  'Sh': 'ষ', 
   'h': 'হ',
-  'DD': 'ড়', // Example for ড়
-  'DH': 'ঢ়', // Example for ঢ়
-  'tt': 'ৎ', // Example for খণ্ড ত
-  'NN': 'ং', // Example for অনুস্বার
-  'HH': 'ঃ', // Example for বিসর্গ
-  'CN': 'ঁ', // Example for চন্দ্রবিন্দু
-  'rN': 'র্ণ', // Added for conjunct র্ + ণ (e.g., pUrNotai -> পূর্ণতাই)
+  'DD': 'ড়', 
+  'DH': 'ঢ়', 
+  'tt': 'ৎ', 
+  'NN': 'ং', 
+  'HH': 'ঃ', 
+  'CN': 'ঁ', 
+  'rN': 'র্ণ', 
 
-  // Vowels (Kar forms when following a consonant, standalone otherwise)
-  // This simple map doesn't handle Kar forms contextually. It provides standalone.
-  // A true IME would handle this by checking previous char.
-  'o': 'অ', // Added for 'অ' sound often typed with 'o'
-  'a': 'আ', // Or 'অ' depending on context or if 'o' is used for অ. Now 'o' is 'অ', 'a' is 'আ'.
+  'o': 'অ', 
+  'a': 'আ', 
   'aa': 'আ', 'A': 'আ',
   'i': 'ই', 'ee': 'ঈ', 'I': 'ঈ',
   'u': 'উ', 'oo': 'ঊ', 'U': 'ঊ',
-  'rri': 'ঋ', // For ঋ
+  'rri': 'ঋ', 
   'e': 'এ', 'E': 'এ',
   'oi': 'ঐ', 'OI': 'ঐ',
-  // 'o': 'ও', 'O': 'ও', // 'o' is now 'অ'. 'ও' sound needs a different key or kar form logic. For standalone 'ও', maybe 'O' or 'oo'. Avro uses 'O'.
-  // Let's keep 'O' for 'ও' for standalone, Kar form logic would be needed for 'ো'
   'O': 'ও', 
   'ou': 'ঔ', 'OU': 'ঔ',
 
@@ -723,10 +223,23 @@ export const PHONETIC_MAP_BN: { [key: string]: string } = {
   "oshudh": "ঔষধ",
   "biddut": "বিদ্যুৎ",
   "poriman": "পরিমাণ",
-  "electric": "ইলেকট্রিক", // Added for "electric"
+  "electric": "ইলেকট্রিক", 
 
-  // Punctuation
-  '.': '।', // Full stop
+  '.': '।', 
   '?': '?',
   '!': '!',
+};
+
+export const BANK_ACCOUNT_TYPES_BN: { [key: string]: string } = {
+  SAVINGS: "সেভিংস অ্যাকাউন্ট",
+  CURRENT: "কারেন্ট অ্যাকাউন্ট",
+  MOBILE_BANKING: "মোবাইল ব্যাংকিং",
+  CARD: "কার্ড (ক্রেডিট/ডেবিট)",
+  CASH_IN_HAND: "হাতে নগদ",
+  OTHER: "অন্যান্য",
+};
+
+export const BANK_ACCOUNT_CURRENCIES_BN: { [key: string]: string } = {
+  BDT: "BDT - বাংলাদেশী টাকা",
+  // Add other currencies if needed later
 };

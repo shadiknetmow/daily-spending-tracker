@@ -1,6 +1,4 @@
 
-
-
 import React from 'react';
 import { Transaction, TransactionType } from '../types';
 import { BN_UI_TEXT } from '../constants';
@@ -10,6 +8,7 @@ import TrashIcon from './icons/TrashIcon';
 import EditIcon from './icons/EditIcon';
 import HistoryIcon from './icons/HistoryIcon'; 
 import UndoIcon from './icons/UndoIcon';
+import BuildingLibraryIcon from './icons/BuildingLibraryIcon'; // New
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -45,6 +44,10 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
   const formatDate = (dateString?: string, includeTime: boolean = false) => {
     if (!dateString) return 'N/A';
     try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) { // Check if date is valid
+          return dateString; // Return original string if not a valid date
+      }
       const options: Intl.DateTimeFormatOptions = {
         day: '2-digit',
         month: 'long', 
@@ -53,10 +56,13 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       if (includeTime) {
         options.hour = '2-digit';
         options.minute = '2-digit';
+        // options.second = '2-digit'; // Optional: if seconds are needed
+        // options.hour12 = true; // Optional: for 12-hour format
+        return date.toLocaleString('bn-BD', options);
       }
-      return new Date(dateString).toLocaleDateString('bn-BD', options);
+      return date.toLocaleDateString('bn-BD', options);
     } catch (e) {
-      return dateString; 
+      return dateString; // Return original string on error
     }
   };
   
@@ -76,6 +82,11 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
           <p className="text-xs text-slate-500">
             {BN_UI_TEXT.DATE}: {transactionDate}
           </p>
+          {transaction.bankAccountName && !transaction.isDeleted && (
+            <p className="text-xs text-sky-600 flex items-center">
+                <BuildingLibraryIcon className="w-3 h-3 mr-1"/> {BN_UI_TEXT.TRANSACTION_LINKED_TO_BANK_ACCOUNT.replace('{bankAccountName}', transaction.bankAccountName)}
+            </p>
+          )}
           {lastModifiedDate && !transaction.isDeleted && (
             <p className="text-xs text-slate-400 italic">
               {BN_UI_TEXT.LAST_MODIFIED_ON} {lastModifiedDate}
@@ -90,7 +101,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       </div>
       <div className="flex items-center space-x-1 sm:space-x-2 self-end sm:self-center mt-2 sm:mt-0">
         <span className={`font-semibold text-lg ${amountColor}`}>
-          {isIncome ? '+' : '-'} {BN_UI_TEXT.BDT_SYMBOL} {transaction.amount.toLocaleString('bn-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {isIncome ? '+' : '-'} {BN_UI_TEXT.BDT_SYMBOL} {(transaction.amount || 0).toLocaleString('bn-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         
         {transaction.isDeleted ? (

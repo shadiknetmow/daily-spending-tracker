@@ -50,11 +50,16 @@ const DebtItem: React.FC<DebtItemProps> = ({
 
   // Ensures 'person' is declared only once in this scope.
   const person = persons.find(p => p.id === debt.personId);
-  const personNameDisplay = person ? person.name : BN_UI_TEXT.UNKNOWN_PERSON;
+  const personNameDisplay = person ? (person.customAlias || person.name) : BN_UI_TEXT.UNKNOWN_PERSON;
+
 
   const formatDate = (dateString?: string, includeTime: boolean = false) => {
     if (!dateString) return 'N/A';
     try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) { // Check if date is valid
+        return dateString; // Return original string if not a valid date
+      }
       const options: Intl.DateTimeFormatOptions = {
         day: '2-digit',
         month: 'long',
@@ -63,10 +68,12 @@ const DebtItem: React.FC<DebtItemProps> = ({
       if (includeTime) {
         options.hour = '2-digit';
         options.minute = '2-digit';
+        // options.hour12 = true; // Optional: for 12-hour format
+        return date.toLocaleString('bn-BD', options);
       }
-      return new Date(dateString).toLocaleDateString('bn-BD', options);
+      return date.toLocaleDateString('bn-BD', options);
     } catch (e) {
-      return dateString;
+      return dateString; 
     }
   };
   
@@ -83,9 +90,10 @@ const DebtItem: React.FC<DebtItemProps> = ({
     }
   };
 
-  const displayRemainingAmount = debt.remainingAmount.toLocaleString('bn-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const displayOriginalAmount = debt.originalAmount.toLocaleString('bn-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const isPartiallyPaid = !debt.isSettled && debt.remainingAmount < debt.originalAmount && debt.remainingAmount > 0;
+  const displayRemainingAmount = (debt.remainingAmount || 0).toLocaleString('bn-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const displayOriginalAmount = (debt.originalAmount || 0).toLocaleString('bn-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const isPartiallyPaid = !debt.isSettled && (debt.remainingAmount || 0) < (debt.originalAmount || 0) && (debt.remainingAmount || 0) > 0;
+
 
   return (
     <li className={`bg-white p-4 rounded-lg shadow-sm border-l-4 ${borderColor} flex flex-col space-y-3 hover:shadow-md transition-shadow duration-150`}>
@@ -141,7 +149,7 @@ const DebtItem: React.FC<DebtItemProps> = ({
             ${debt.isSettled 
             ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' 
             : (isReceivable ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200')}`}
-        disabled={debt.isSettled && debt.remainingAmount > 0} 
+        disabled={debt.isSettled && (debt.remainingAmount || 0) > 0} 
         >
         {debt.isSettled ? BN_UI_TEXT.MARK_AS_UNSETTLED : BN_UI_TEXT.MARK_AS_SETTLED}
         </button>

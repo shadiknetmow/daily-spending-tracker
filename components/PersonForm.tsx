@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, FormEvent, useRef, useCallback } from 'react';
-import { Person, User } from '../types';
-import { BN_UI_TEXT } from '../constants';
+import { Person, User } from '../types'; // Updated path
+import { BN_UI_TEXT } from '../constants'; // Updated path
 import { useNotification } from '../contexts/NotificationContext'; 
 import CameraIcon from './icons/CameraIcon'; 
 import TrashIcon from './icons/TrashIcon'; 
@@ -14,7 +13,7 @@ export interface ImportedUserDetails {
   email?: string;
   mobileNumber: string; 
   profileImage?: string; 
-  systemUserId: string; // Added systemUserId
+  systemUserId: string;
 }
 
 interface PersonFormProps {
